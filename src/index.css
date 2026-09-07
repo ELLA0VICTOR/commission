@@ -465,6 +465,15 @@ button:disabled { color: var(--text-faint); opacity: 1; }
   .preview-modal .modal-inner { padding: 16px; gap: 12px; }
 }
 
-.poster-frame.poster-empty { border: 2px dotted var(--border-strong); background: transparent; display: grid; place-items: center; }
-.poster-empty-content { color: var(--text-muted); display: grid; place-items: center; }
-.poster-empty-content svg { width: 32px; height: 32px; }
+.poster-frame.poster-empty { border: 0; background: var(--bg-base); position: relative; display: grid; place-items: center; }
+.poster-empty-content { color: var(--text-muted); padding: 24px 16px; width: 100%; text-align: center; }
+.canvas-corner { position: absolute; width: 18px; height: 18px; border-color: var(--border-strong); border-style: solid; border-width: 0; pointer-events: none; }
+.canvas-corner.top-left { top: 0; left: 0; border-top-width: 1px; border-left-width: 1px; }
+.canvas-corner.top-right { top: 0; right: 0; border-top-width: 1px; border-right-width: 1px; }
+.canvas-corner.bottom-left { bottom: 0; left: 0; border-bottom-width: 1px; border-left-width: 1px; }
+.canvas-corner.bottom-right { bottom: 0; right: 0; border-bottom-width: 1px; border-right-width: 1px; }
+.empty-artwork-mark { width: 52px; height: 52px; margin: 0 auto 18px; display: grid; place-items: center; border: 1px solid var(--border-subtle); border-radius: 50%; }
+.poster-empty-content .empty-artwork-mark svg { width: 28px; height: 28px; }
+.poster-empty-content p { font-size: 12px; line-height: 1.6; max-width: 190px; margin: 0; }
+@media (max-height: 650px) { .empty-artwork-mark { margin-bottom: 10px; } .poster-empty-content p { margin: 6px auto 12px; } }
+
