@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { defaultBrief, uploadedNarrationSchema, type Project } from '../../shared/domain'
-const key = 'commission.projects.v1'
+const key = 'commission.projects.v2'
 const draftBrief = z.object({
   title: z.string().max(64), subtitle: z.string().max(100), date: z.string().max(10),
   time: z.string().max(30), venue: z.string().max(90), callToAction: z.string().max(60),
@@ -9,10 +9,12 @@ const draftBrief = z.object({
 })
 const draftPlan = z.object({ concept: z.string().max(500), imagePrompt: z.string().max(1800), narration: z.string().max(700), caption: z.string().max(1600) })
 export function createProject(): Project {
-  return { id: crypto.randomUUID(), brief: { ...defaultBrief }, createdAt: new Date().toISOString() }
+  return { id: crypto.randomUUID(), brief: { ...defaultBrief, title: '', subtitle: '', date: '', time: '', venue: '', callToAction: '', details: '' }, createdAt: new Date().toISOString() }
 }
 export function loadProjects(): Project[] {
   try {
+    // Retire the previous demo workspace; new drafts persist under v2.
+    localStorage.removeItem('commission.projects.v1')
     const raw: unknown = JSON.parse(localStorage.getItem(key) || '[]')
     if (Array.isArray(raw)) {
       const result = raw.filter((value): value is Project =>

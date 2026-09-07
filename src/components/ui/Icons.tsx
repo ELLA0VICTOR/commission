@@ -43,3 +43,5 @@ export const AgentMark = glyph(<>
   <circle cx="3.7" cy="7.4" r="1" fill="currentColor" stroke="none" />
   <circle cx="20.3" cy="16.6" r="1" fill="currentColor" stroke="none" />
 </>)
+
+export const CircleAlert = glyph(<><circle cx="12" cy="12" r="9" /><path d="M12 7v6m0 4h.01" /></>)

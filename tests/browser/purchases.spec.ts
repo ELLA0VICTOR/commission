@@ -82,7 +82,7 @@ test('narrated video contains both a video track and an Opus audio track', async
   const id = randomUUID()
   const plan: Plan = { concept: 'Test campaign direction.', imagePrompt: 'A blue abstract image with no text.', narration: 'A test invitation for the event.', caption: 'A test event invitation.' }
   await page.addInitScript(({ id, brief, plan }) => {
-    localStorage.setItem('commission.projects.v1', JSON.stringify([{
+    localStorage.setItem('commission.projects.v2', JSON.stringify([{
       id, brief, plan, planKey: JSON.stringify({ ...brief, budget: undefined }), createdAt: new Date().toISOString(),
     }]))
   }, { id, brief: defaultBrief, plan })

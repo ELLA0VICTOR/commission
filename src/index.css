@@ -314,7 +314,7 @@ svg[aria-hidden="true"] { stroke-linecap: square; stroke-linejoin: miter; }
 .topbar { height: 64px; background: var(--bg-base); }
 .workspace { height: calc(100dvh - 64px); min-height: 550px; display: flex; flex-direction: column; padding: 18px 28px 12px; }
 .workspace-heading { flex-shrink: 0; margin-bottom: 14px; }
-.workspace-heading h1 { margin: 0; }
+.workspace-heading h1 { margin: 0; font-size: clamp(22px, 2vw, 28px); letter-spacing: -.7px; }
 .hero-zone { flex: 1; min-height: 0; width: 100%; max-width: 1080px; align-self: center; }
 .preview-panel { height: 100%; border: 0; border-radius: 4px; background: var(--bg-raised); display: grid; grid-template-rows: 48px minmax(0, 1fr) 30px; }
 .preview-toolbar { padding: 8px 20px; gap: 12px; }
@@ -451,3 +451,20 @@ button:disabled { color: var(--text-faint); opacity: 1; }
 .narration-recording audio { width: 100%; color-scheme: dark; }
 .narration-filename { overflow-wrap: anywhere; }
 .narration-actions { display: flex; justify-content: space-between; gap: 16px; }
+
+/* Keep the expanded artwork and its corners inside the viewport. */
+.preview-modal { width: calc(100vw - 48px); max-width: 800px; height: calc(100dvh - 64px); max-height: calc(100dvh - 64px); overflow: hidden; }
+.preview-modal .modal-inner { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 16px; padding: 24px; }
+.preview-modal .modal-inner > div:first-child { flex-shrink: 0; margin-bottom: 0; }
+.preview-modal h2 { font-size: 20px; line-height: 1.25; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preview-modal .expanded-poster { flex: 1; min-height: 0; max-width: none; width: 100%; margin: 0; padding: 8px; display: flex; justify-content: center; }
+.preview-modal .expanded-poster svg { display: block; width: 100%; height: 100%; }
+.preview-modal .footnote { flex-shrink: 0; margin: 0; text-align: center; }
+@media (max-width: 700px) {
+  .preview-modal { width: calc(100vw - 24px); height: calc(100dvh - 32px); max-height: calc(100dvh - 32px); }
+  .preview-modal .modal-inner { padding: 16px; gap: 12px; }
+}
+
+.poster-frame.poster-empty { border: 2px dotted var(--border-strong); background: transparent; display: grid; place-items: center; }
+.poster-empty-content { color: var(--text-muted); display: grid; place-items: center; }
+.poster-empty-content svg { width: 32px; height: 32px; }

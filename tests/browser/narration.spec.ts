@@ -9,7 +9,7 @@ test('uploaded narration persists, plays, exports audio, and becomes stale after
   const plan: Plan = { concept: 'An evening of independent music.', imagePrompt: 'A quiet architectural rooftop without lettering.', narration: 'Join us for an evening of music on the rooftop.', caption: 'An evening of music at The Terrace.' }
   const before = await (await request.get('/api/orders')).json()
   await page.addInitScript(({ id, brief, plan }) => {
-    if (!localStorage.getItem('commission.projects.v1')) localStorage.setItem('commission.projects.v1', JSON.stringify([{ id, brief, plan, planKey: JSON.stringify({ ...brief, budget: undefined }), createdAt: new Date().toISOString() }]))
+    if (!localStorage.getItem('commission.projects.v2')) localStorage.setItem('commission.projects.v2', JSON.stringify([{ id, brief, plan, planKey: JSON.stringify({ ...brief, budget: undefined }), createdAt: new Date().toISOString() }]))
   }, { id, brief: defaultBrief, plan })
   const records: Order[] = [{ id: randomUUID(), projectId: id, service: 'image', status: 'delivered', amount: '0.05', token: 'U', inputKey: 'fixture', settled: false, createdAt: new Date().toISOString(), assetUrl: '/api/assets/narration-fixture.png' }, { id: randomUUID(), projectId: id, service: 'voice', status: 'uncertain', amount: '0.01', token: 'U', inputKey: 'fixture', settled: false, createdAt: new Date().toISOString(), error: 'The speech provider is out of credits.' }]
   await page.route('**/api/orders', route => route.fulfill({ json: records }))

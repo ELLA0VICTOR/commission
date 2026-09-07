@@ -5,7 +5,7 @@ import { defaultBrief, type Order } from '../../shared/domain.ts'
 test('conversation updates the saved preview and receives a settled purchase', async ({ page }) => {
   const id = randomUUID()
   let orders: Order[] = []
-  await page.addInitScript(({ id, brief }) => { if (!localStorage.getItem('commission.projects.v1')) localStorage.setItem('commission.projects.v1', JSON.stringify([{ id, brief, createdAt: new Date().toISOString() }])) }, { id, brief: defaultBrief })
+  await page.addInitScript(({ id, brief }) => { if (!localStorage.getItem('commission.projects.v2')) localStorage.setItem('commission.projects.v2', JSON.stringify([{ id, brief, createdAt: new Date().toISOString() }])) }, { id, brief: defaultBrief })
   await page.route('**/api/orders', route => route.fulfill({ json: orders }))
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/')
