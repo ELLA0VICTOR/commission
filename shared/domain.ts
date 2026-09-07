@@ -20,7 +20,13 @@ export const planSchema = z.object({
 })
 export type Plan = z.infer<typeof planSchema>
 export type Service = 'plan' | 'image' | 'voice'
-export type Project = { id: string; brief: Brief; createdAt: string; plan?: Plan; planKey?: string; planOrderId?: string; briefConfirmed?: boolean; agentField?: keyof Brief; messages?: { id: string; role: 'user' | 'agent'; text: string; createdAt: string }[] }
+export const uploadedNarrationSchema = z.object({
+  assetUrl: z.string().regex(/^\/api\/assets\/uploaded-[0-9a-f-]{36}\.(mp3|wav)$/),
+  filename: z.string().min(1).max(180), duration: z.number().positive().max(60),
+  sourceText: z.string().max(700), addedAt: z.string(),
+})
+export type UploadedNarration = z.infer<typeof uploadedNarrationSchema>
+export type Project = { uploadedNarration?: UploadedNarration; id: string; brief: Brief; createdAt: string; plan?: Plan; planKey?: string; planOrderId?: string; briefConfirmed?: boolean; agentField?: keyof Brief; messages?: { id: string; role: 'user' | 'agent'; text: string; createdAt: string }[] }
 export type Quote = {
   id: string; projectId: string; service: Service; amount: string; token: string;
   tokenAddress: string; payTo: string; expiresAt: number; ready: boolean; reasons: string[];

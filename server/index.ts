@@ -1,3 +1,4 @@
+import { saveUploadedAudio } from './audio-upload.ts'
 import express from 'express'
 import { fulfill } from './fulfillment.ts'
 import { randomUUID, randomBytes } from 'node:crypto'
@@ -34,6 +35,11 @@ app.use('/api/assets', express.static(assetDir, { dotfiles: 'deny' }))
 app.get('/api/session', (_req, res) => res.json({ token: sessionToken }))
 app.get('/api/health', (_req, res) => res.json({ ok: true, mode: 'local', wallet: 'Binance Agentic Wallet', payments: 'B402 / BNB Chain' }))
 app.get('/api/orders', (_req, res) => res.json(orders))
+// Uploads are local assets, never purchase records, and require the same local session.
+app.post('/api/narration/upload', express.raw({ type: ['audio/mpeg', 'audio/wav'], limit: '10mb' }), async (req, res) => {
+  if (!Buffer.isBuffer(req.body)) throw new Error('Choose an MP3 or WAV recording.')
+  res.json(await saveUploadedAudio(req.body, req.headers['content-type']?.split(';')[0] || ''))
+})
 
 app.get('/api/wallet', async (_req, res) => {
   const status = await baw<{ status: string }>(['wallet', 'status'])

@@ -58,6 +58,7 @@ test('payment approval is explicit; changed facts require copy review before nar
   await page.getByRole('button', { name: 'Save brief', exact: true }).click()
   await page.getByRole('button', { name: 'Open Agent', exact: true }).click()
   await page.getByRole('button', { name: 'Voiceover', exact: true }).click()
+  await page.getByRole('button', { name: 'Request paid voiceover', exact: true }).click()
   await expect(page.getByRole('dialog').getByRole('alert')).toContainText('Your brief changed')
   expect(purchases).toBe(1)
   await page.getByRole('button', { name: 'Review copy', exact: true }).click()

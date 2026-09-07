@@ -441,3 +441,13 @@ button:disabled { color: var(--text-faint); opacity: 1; }
 .wallet-address-label { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
 .wallet-copy { width: 28px; height: 28px; color: var(--text-muted); }
 .wallet-copy-feedback:not(:empty) { position: absolute; right: 0; top: calc(100% + 9px); z-index: 40; width: max-content; max-width: 230px; padding: 7px 10px; background: var(--bg-inset); border: 1px solid var(--border-subtle); border-radius: 4px; color: var(--text-secondary); font-size: 11px; }
+
+.narration-panel { display: flex; flex-direction: column; gap: 16px; }
+.narration-panel>p { line-height: 1.6; }
+.narration-file::file-selector-button { font: inherit; color: var(--text-secondary); background: var(--bg-inset); border: 1px solid var(--border-strong); border-radius: 3px; padding: 7px 10px; margin-right: 10px; cursor: pointer; }
+.narration-recording { border-block: 1px solid var(--border-subtle); padding-block: 16px; display: flex; flex-direction: column; gap: 12px; }
+.narration-recording>div:first-child { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.narration-recording>div:first-child>span { margin-left: auto; color: var(--text-muted); }
+.narration-recording audio { width: 100%; color-scheme: dark; }
+.narration-filename { overflow-wrap: anywhere; }
+.narration-actions { display: flex; justify-content: space-between; gap: 16px; }

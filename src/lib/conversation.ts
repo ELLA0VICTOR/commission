@@ -1,6 +1,6 @@
 import { briefSchema, type Brief, type Project } from '../../shared/domain'
 
-export type AgentAction = 'brief' | 'edit' | 'direction' | 'image' | 'voice' | 'review' | 'wallet' | 'export' | 'receipts'
+export type AgentAction = 'upload' | 'brief' | 'edit' | 'direction' | 'image' | 'voice' | 'review' | 'wallet' | 'export' | 'receipts'
 export type ChatMessage = { id: string; role: 'user' | 'agent'; text: string; createdAt: string }
 export type ConversationResult = { reply: string; brief?: Brief; field?: keyof Brief; confirmed?: boolean; action?: AgentAction }
 export const fields: (keyof Brief)[] = ['title', 'subtitle', 'date', 'time', 'venue', 'callToAction', 'direction', 'details', 'budget']
@@ -42,6 +42,7 @@ export function respond(project: Project, input: string): ConversationResult {
   const text = input.trim()
   const command = text.toLowerCase().replace(/[.!?]+$/, '')
   const actions: [RegExp, AgentAction, string][] = [
+    [/^(?:upload|import|add)(?: my| a| the)? (?:audio|narration|voiceover)$/, 'upload', 'Opening narration. Select an MP3 or WAV from your computer; uploading makes no payment.'],
     [/^(?:build|start|create|write)(?: my| a| the)? brief$/, 'brief', prompts.title],
     [/^(?:edit|show|open)(?: my| the)? brief$/, 'edit', 'Opening the brief editor. Your changes appear in the preview immediately.'],
     [/^(?:(?:get|buy|create|commission|generate)(?: the| a| my)? )?(?:creative )?direction$/, 'direction', 'I’ll request the live price for creative direction. You will review it before payment.'],

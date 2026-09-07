@@ -1,6 +1,6 @@
 # Commission
 
-An independent production studio for event campaigns. An agent turns a brief into creative direction, buys artwork and narration from Xona through Binance B402, and assembles usable campaign files.
+An independent production studio for event campaigns. An agent turns a brief into creative direction, buys creative direction and artwork from Xona through Binance B402, and assembles usable campaign files.
 
 Built for Binance Agent OS Track A, Payment Workflows. The Agent OS integration is **Binance Agentic Wallet + B402**, not the trading MCP endpoint.
 
@@ -47,12 +47,20 @@ If the pairing code expires, start a fresh pairing. Do not edit backend files du
 - Open **Agent** and choose **Build my brief**, or send a field edit such as `venue: The Listening Room`. Conversation and manual edits share the same saved brief and live preview. All fields remain available behind **Edit brief**.
 - Briefing uses a local guided conversation, not an additional language-model API. It supports field edits and production commands; paid AI creative direction still runs through Xona/B402.
 - Review a live quote for creative direction. After approval, GPT-5.2 produces a concept, image prompt, narration, and social caption.
-- Review or edit the generated direction. Commission passes the reviewed visual prompt to FLUX.2 Pro and the reviewed script to text-to-speech.
+- Review or edit the generated direction. Commission passes the reviewed visual prompt to FLUX.2 Pro. Reviewed copy and delivered artwork complete the campaign; voiceover is optional.
 - Purchase those services individually with explicit price approval.
-- Download a PNG poster, PNG story, caption, original voiceover, and receipts in a ZIP. The narrated vertical promo exports separately as **WebM**, with movement in the artwork and stationary event details.
+- Download a PNG poster, PNG story, caption, and receipts in a ZIP, with narration included when selected. The animated vertical promo exports separately as **WebM**, with movement in the artwork and stationary event details. Audio is optional.
 - Date, time, and venue changes reuse the purchased image. Changes to the script make the previous voiceover ineligible for new exports. Review copy after brief changes before purchasing narration or exporting the pack.
 
 Before a purchase, the interface uses an explicitly labelled local layout preview. Preview PNG/ZIP and silent WebM exports are real files, but are **not evidence of paid AI generation**.
+
+## Uploaded narration fallback
+
+Open **Export > Optional voiceover**, or **Agent > Upload audio**. Upload an MP3 or WAV up to 60 seconds and 10 MB. Listen to it in the narration panel, then export the ZIP or narrated WebM. The file is saved under .commission-data/assets; its campaign association is saved in browser localStorage.
+
+Uploaded narration is clearly labelled and makes no wallet payment. Failed provider receipts remain visible. The ZIP includes voiceover-uploaded.mp3/wav and declares its source in campaign.json and READ-ME.txt. Editing the script excludes an older recording until you replace it or confirm that it still matches. Removing narration detaches it from the campaign without deleting the local original.
+
+Xona's speech endpoint returned a provider credit/spending-limit error during live testing on September 7. Commission disables the paid voice action when its saved records report that error. The campaign can be completed without narration. Optional uploads do not resolve or refund those earlier purchases.
 
 ## Payments and failure handling
 
@@ -88,7 +96,7 @@ Browser tests use installed Microsoft Edge in a separate headless profile. They 
 
 The provider-check script sends **unsigned requests only**. On September 6, 2026, the example brief returned valid B402 challenges: 0.014823 U for direction, 0.05 U for artwork, and 0.01 U for voice. Prices are live quotes, not constants.
 
-**Live acceptance gate still required:** connect and fund the wallet, complete one real creative-direction purchase, then artwork and narration, inspect settlement and files, and export a real narrated promo. Mock tests and unsigned challenges cannot establish successful paid delivery.
+**Live test status:** creative direction and artwork were purchased and delivered, and the campaign was exported. Paid speech failed because of the provider credit limit; it is not a successful paid delivery. Optional uploaded narration was separately verified in ZIP and WebM exports without additional payments.
 
 ## Structure
 

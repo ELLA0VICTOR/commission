@@ -3,7 +3,7 @@ import { serviceNames, type Order, type Project } from '../../../shared/domain'
 import type { AgentAction } from '../../lib/conversation'
 import { Modal } from '../ui/Modal'
 import { AgentMark, ArrowUpRight, LoaderCircle, ReceiptText, Send } from '../ui/Icons'
-const actions: [AgentAction, string][] = [['brief', 'Build my brief'], ['direction', 'Direction'], ['image', 'Artwork'], ['voice', 'Voiceover'], ['review', 'Review copy'], ['wallet', 'Wallet'], ['export', 'Export']]
+const actions: [AgentAction, string][] = [['brief', 'Build my brief'], ['direction', 'Direction'], ['image', 'Artwork'], ['voice', 'Voiceover'], ['upload', 'Upload audio'], ['review', 'Review copy'], ['wallet', 'Wallet'], ['export', 'Export']]
 export function AgentPanel({ project, orders, busy, error, onSend, onAction, onClose, onClear }: {
   project: Project; orders: Order[]; busy: boolean; error: string; onSend: (text: string) => void;
   onAction: (action: AgentAction) => void; onClose: () => void; onClear: () => void;
@@ -29,6 +29,7 @@ export function AgentPanel({ project, orders, busy, error, onSend, onAction, onC
         {order.status === 'processing' && <LoaderCircle size={14} className="animate-spin" />}
         <span>{serviceNames[order.service]}: {order.status === 'processing' ? 'producing. Keep the local service running.' : order.status === 'delivered' ? 'delivered. Settlement not yet confirmed.' : order.error || 'delivery needs review.'}</span>
       </div>)}
+      {project.uploadedNarration && <div className="chat-message incoming">Uploaded narration: {project.uploadedNarration.filename}. {project.uploadedNarration.sourceText === (project.plan?.narration || '') ? 'Selected for export. No B402 payment.' : 'Script changed; review the recording before export.'}</div>}
       {error && <div className="chat-message incoming chat-error" role="alert">{error}</div>}
       {busy && <div className="agent-working" role="status"><LoaderCircle size={14} className="animate-spin" /> Checking the current request…</div>}
       <div ref={end} />

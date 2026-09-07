@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { defaultBrief, type Project } from '../../shared/domain'
+import { defaultBrief, uploadedNarrationSchema, type Project } from '../../shared/domain'
 const key = 'commission.projects.v1'
 const draftBrief = z.object({
   title: z.string().max(64), subtitle: z.string().max(100), date: z.string().max(10),
@@ -20,6 +20,7 @@ export function loadProjects(): Project[] {
         draftBrief.safeParse(value.brief).success && (!value.plan || draftPlan.safeParse(value.plan).success))
       if (result.length) return result.map(project => ({
         ...project,
+        uploadedNarration: uploadedNarrationSchema.safeParse(project.uploadedNarration).success ? project.uploadedNarration : undefined,
         agentField: project.agentField && Object.keys(defaultBrief).includes(project.agentField) ? project.agentField : undefined,
         messages: z.array(z.object({ id: z.string(), role: z.enum(['user', 'agent']), text: z.string().max(4000), createdAt: z.string() })).max(150).safeParse(project.messages).success ? project.messages : [],
       }))

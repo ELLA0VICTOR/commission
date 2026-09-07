@@ -1,5 +1,5 @@
 import { Check } from '../ui/Icons'
-const labels = ['Brief', 'Direction', 'Artwork', 'Voiceover', 'Ready']
+const labels = ['Brief', 'Direction', 'Artwork', 'Ready']
 export function ProgressStrip({ current, onStep }: { current: number; onStep: (index: number) => void }) {
   return <nav className="progress-strip" aria-label="Campaign progress"><ol>{labels.map((label, index) => {
     const state = index < current ? 'complete' : index === current ? 'current' : 'upcoming'

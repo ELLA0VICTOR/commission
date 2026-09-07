@@ -51,7 +51,7 @@ export function filename(brief: Brief) { return brief.title.toLowerCase().replac
 export function fallbackCaption(brief: Brief) {
   return [brief.title, brief.subtitle, '', dateLabel(brief.date) + ' · ' + brief.time, brief.venue, '', brief.callToAction].join('\n')
 }
-export async function campaignZip(brief: Brief, orders: Order[], plan?: Plan, artwork?: string, audio?: string) {
+export async function campaignZip(brief: Brief, orders: Order[], plan?: Plan, artwork?: string, audio?: string, audioSource?: 'Uploaded narration' | 'B402 purchase') {
   const [poster, story] = await Promise.all([
     posterCanvas(brief, 'poster', artwork).then(canvasBlob),
     posterCanvas(brief, 'story', artwork).then(canvasBlob),
@@ -60,13 +60,14 @@ export async function campaignZip(brief: Brief, orders: Order[], plan?: Plan, ar
     'poster.png': new Uint8Array(await poster.arrayBuffer()),
     'story.png': new Uint8Array(await story.arrayBuffer()),
     'caption.txt': strToU8(plan?.caption || fallbackCaption(brief)),
-    'campaign.json': strToU8(JSON.stringify({ brief, plan, artwork: artwork ? 'Purchased' : 'Local layout preview', receipts: orders }, null, 2)),
-    'READ-ME.txt': strToU8('Created with Commission. ' + (artwork ? 'Includes purchased artwork.' : 'LAYOUT PREVIEW: artwork has not been purchased or generated.') + '\nReview event details and provider terms before publishing.\nMotion promo is exported separately as WebM in the workspace.'),
+    'campaign.json': strToU8(JSON.stringify({ brief, plan, artwork: artwork ? 'Purchased' : 'Local layout preview', narration: audio ? { source: audioSource || 'B402 purchase' } : null, receipts: orders }, null, 2)),
+    'READ-ME.txt': strToU8('Created with Commission. ' + (artwork ? 'Includes purchased artwork.' : 'LAYOUT PREVIEW: artwork has not been purchased or generated.') + (audio ? '\nNarration source: ' + (audioSource || 'B402 purchase') + '.' : '\nNo narration included.') + '\nReview event details and provider terms before publishing.\nMotion promo is exported separately as WebM in the workspace.'),
   }
+  if (plan?.narration) files['narration-script.txt'] = strToU8(plan.narration)
   if (audio) {
     const response = await fetch(audio)
     if (!response.ok) throw new Error('Could not include the voiceover. Try again.')
-    files['voiceover.' + (audio.split('.').pop() || 'mp3')] = new Uint8Array(await response.arrayBuffer())
+    files[(audioSource === 'Uploaded narration' ? 'voiceover-uploaded.' : 'voiceover.') + (audio.split('.').pop() || 'mp3')] = new Uint8Array(await response.arrayBuffer())
   }
   return new Blob([zipSync(files, { level: 0 })], { type: 'application/zip' })
 }
@@ -89,10 +90,10 @@ export async function motionPromo(brief: Brief, artwork: string | undefined, aud
     let duration = 8
     if (audio) {
       const response = await fetch(audio)
-      if (!response.ok) throw new Error('Could not load the purchased voiceover.')
+      if (!response.ok) throw new Error('Could not load the selected narration.')
       const buffer = await context.decodeAudioData(await response.arrayBuffer())
       duration = buffer.duration + .5
-      if (duration > 60) throw new Error('This voiceover exceeds the 60-second local video limit.')
+      if (buffer.duration > 60) throw new Error('This voiceover exceeds the 60-second local video limit.')
       source = context.createBufferSource(); source.buffer = buffer
       const destination = context.createMediaStreamDestination()
       source.connect(destination); destination.stream.getAudioTracks().forEach(track => stream!.addTrack(track))
