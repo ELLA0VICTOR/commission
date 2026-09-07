@@ -44,7 +44,8 @@ If the pairing code expires, start a fresh pairing. Do not edit backend files du
 
 ## Campaign flow
 
-- Edit the example brief, event facts, atmosphere, and token budget.
+- Open **Agent** and choose **Build my brief**, or send a field edit such as `venue: The Listening Room`. Conversation and manual edits share the same saved brief and live preview. All fields remain available behind **Edit brief**.
+- Briefing uses a local guided conversation, not an additional language-model API. It supports field edits and production commands; paid AI creative direction still runs through Xona/B402.
 - Review a live quote for creative direction. After approval, GPT-5.2 produces a concept, image prompt, narration, and social caption.
 - Review or edit the generated direction. Commission passes the reviewed visual prompt to FLUX.2 Pro and the reviewed script to text-to-speech.
 - Purchase those services individually with explicit price approval.
@@ -92,14 +93,15 @@ The provider-check script sends **unsigned requests only**. On September 6, 2026
 ## Structure
 
 - src/components/layout — navigation and workspace shell.
-- src/components/campaign — brief editor, poster renderer, previews, and production desk.
+- src/components/campaign — brief editor, poster renderer, previews, and production progress.
+- src/components/agent ? conversation, production actions, and settlement receipts.
 - src/components/wallet — pairing and exact-price approval.
 - src/lib — local drafts, API client, and lazily loaded export tools.
 - shared — typed and validated campaign data.
 - server — local wallet adapter, payment policy, provider transport, durable receipts, and recovery.
 - tests — payment failure tests and real-browser workflow checks.
 
-The interface uses one warm charcoal-and-champagne-gold theme, Tailwind CSS, locally bundled Hanken Grotesk, custom line-art SVG glyphs, and custom SVG artwork. The live invitation leads the layout, with a compact brief and service menu. A CSS-only assembly sequence respects reduced-motion preferences and does not affect exported files. Preview artwork is code-generated; paid artwork comes from the selected provider.
+The interface uses one warm charcoal-and-champagne-gold theme, Tailwind CSS, locally bundled Hanken Grotesk, custom line-art SVG glyphs, and custom SVG artwork. The live invitation leads the layout, above a five-step progress strip and settlement footer. The floating Agent panel handles briefing and production; settled purchases appear as inline receipts. A CSS-only assembly sequence respects reduced-motion preferences and does not affect exported files. Preview artwork is code-generated; paid artwork comes from the selected provider.
 
 ## Integration references
 

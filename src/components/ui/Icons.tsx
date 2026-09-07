@@ -30,3 +30,7 @@ export const Image = glyph(<><path d="M3 3h18v18H3zM3 18l6-7 5 6 3-4 4 5" /><cir
 export const LoaderCircle = glyph(<path d="M21 12a9 9 0 1 1-9-9" />)
 export const Copy = glyph(<path d="M8 8h13v13H8zM4 16H2V2h14v2" />)
 export const ShieldCheck = glyph(<path d="M12 2 3 6v6c0 5 9 10 9 10s9-5 9-10V6l-9-4Zm-5 9 4 4 6-7" />)
+
+export const Message = glyph(<path d="M3 4h18v13H9l-6 4V4Zm4 5h10M7 13h6" />)
+export const Send = glyph(<path d="m3 11 18-8-8 18-2-8-8-2Zm8 2L21 3" />)
+export const LogoMark = glyph(<><path d="M18 6H10a6 6 0 0 0 0 12h8v-4h-8a2 2 0 0 1 0-4h8z" fill="var(--accent-gold)" stroke="none" /><path d="M17 9h5v6h-5z" fill="var(--text-primary)" stroke="none" /></>)

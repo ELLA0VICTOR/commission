@@ -23,8 +23,11 @@ export async function posterCanvas(brief: Brief, format: Format, artwork?: strin
   await document.fonts.ready
   const embeddedArtwork = artwork ? await dataUrl(await (await fetch(artwork)).blob()) : undefined
   const font = await dataUrl(await (await fetch(fontUrl)).blob())
+  const tokenNames = ['--bg-base', '--bg-raised', '--bg-inset', '--border-subtle', '--border-strong', '--text-primary', '--text-secondary', '--text-muted', '--text-faint', '--accent-gold', '--accent-gold-on', '--success-dot']
+  const computed = getComputedStyle(document.documentElement)
+  const colors = ':root{' + tokenNames.map(name => name + ':' + computed.getPropertyValue(name)).join(';') + '}'
   let svg = renderToStaticMarkup(<Poster brief={brief} format={format} artwork={embeddedArtwork} layer={layer} />)
-  svg = svg.replace('<defs>', '<defs><style>@font-face{font-family:"Hanken Grotesk Variable";src:url(' + font + ') format("woff2");font-weight:100 900}</style>')
+  svg = svg.replace('<defs>', '<defs><style>' + colors + '@font-face{font-family:"Hanken Grotesk Variable";src:url(' + font + ') format("woff2");font-weight:100 900}</style>')
   const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml;charset=utf-8' }))
   try {
     const canvas = document.createElement('canvas')
@@ -46,7 +49,7 @@ export function download(blob: Blob, name: string) {
 }
 export function filename(brief: Brief) { return brief.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'campaign' }
 export function fallbackCaption(brief: Brief) {
-  return [brief.title, brief.subtitle, '', dateLabel(brief.date) + ' Â· ' + brief.time, brief.venue, '', brief.callToAction].join('\n')
+  return [brief.title, brief.subtitle, '', dateLabel(brief.date) + ' · ' + brief.time, brief.venue, '', brief.callToAction].join('\n')
 }
 export async function campaignZip(brief: Brief, orders: Order[], plan?: Plan, artwork?: string, audio?: string) {
   const [poster, story] = await Promise.all([

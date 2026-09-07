@@ -1,7 +1,7 @@
-import { ArrowUpRight, Check, ChevronDown } from '../ui/Icons'
+import { Check, ChevronDown } from '../ui/Icons'
 import type { Brief } from '../../../shared/domain'
-export function BriefEditor({ brief, onChange, onReview, busy, connected, hasPlan }: {
-  brief: Brief; onChange: (value: Brief) => void; onReview: () => void; busy: boolean; connected: boolean; hasPlan: boolean;
+export function BriefEditor({ brief, onChange, onReview, busy }: {
+  brief: Brief; onChange: (value: Brief) => void; onReview: () => void; busy: boolean;
 }) {
   function field(key: keyof Brief, value: string) { onChange({ ...brief, [key]: value }) }
   return <section className="brief-panel" aria-labelledby="brief-title">
@@ -16,7 +16,6 @@ export function BriefEditor({ brief, onChange, onReview, busy, connected, hasPla
       <label className="field">What should people know?<textarea value={brief.details} maxLength={600} rows={3} onChange={e => field('details', e.target.value)} placeholder="Audience, atmosphere, and the details that matter." /></label>
     </div>
     <div className="budget-field"><div><label htmlFor="budget">Production budget</label></div><div className="amount-input"><input id="budget" inputMode="decimal" aria-label="Production budget in U" value={brief.budget} onChange={e => field('budget', e.target.value)} /><span>U</span></div></div>
-    <button className="button primary w-full" disabled={busy} onClick={onReview}>{busy ? 'Getting a live quote…' : hasPlan ? 'Review new creative direction' : connected ? 'Commission creative direction' : 'Connect wallet to produce'}<ArrowUpRight size={17} /></button>
-    <p className="footnote text-center mt-3">Review every price before paying.</p>
+    <button className="button secondary w-full" disabled={busy} onClick={onReview}>Save brief</button>
   </section>
 }

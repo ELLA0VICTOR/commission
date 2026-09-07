@@ -18,7 +18,11 @@ export function loadProjects(): Project[] {
       const result = raw.filter((value): value is Project =>
         value && z.string().uuid().safeParse(value.id).success &&
         draftBrief.safeParse(value.brief).success && (!value.plan || draftPlan.safeParse(value.plan).success))
-      if (result.length) return result
+      if (result.length) return result.map(project => ({
+        ...project,
+        agentField: project.agentField && Object.keys(defaultBrief).includes(project.agentField) ? project.agentField : undefined,
+        messages: z.array(z.object({ id: z.string(), role: z.enum(['user', 'agent']), text: z.string().max(4000), createdAt: z.string() })).max(150).safeParse(project.messages).success ? project.messages : [],
+      }))
     }
   } catch { /* A corrupt or unavailable store starts a fresh local draft. */ }
   const initial = [createProject()]

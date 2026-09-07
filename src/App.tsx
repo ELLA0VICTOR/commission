@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowDownToLine, ArrowUpRight, Check, ChevronRight, CircleHelp, Menu, ReceiptText, WalletCards, X } from './components/ui/Icons'
+import { ArrowDownToLine, ArrowUpRight, ChevronRight, CircleHelp, Menu, Message, ReceiptText, WalletCards, X } from './components/ui/Icons'
 import { briefSchema, planSchema, serviceNames, type Brief, type Order, type Plan, type Project, type Quote, type Service, type Wallet } from '../shared/domain'
 import { Sidebar } from './components/layout/Sidebar'
 import { BriefEditor } from './components/campaign/BriefEditor'
 import { Poster, type Format } from './components/campaign/Poster'
 import { Preview } from './components/campaign/Preview'
-import { Production } from './components/campaign/Production'
+import { ProgressStrip } from './components/campaign/ProgressStrip'
+import { DirectionEditor } from './components/campaign/DirectionEditor'
+import { AgentPanel } from './components/agent/AgentPanel'
+import { chatMessage, respond, type AgentAction } from './lib/conversation'
 import { WalletDialog } from './components/wallet/WalletDialog'
 import { PurchaseDialog } from './components/wallet/PurchaseDialog'
 import { Modal } from './components/ui/Modal'
@@ -19,13 +22,14 @@ export default function App() {
   const [wallet, setWallet] = useState<Wallet>({ connected: false })
   const [orders, setOrders] = useState<Order[]>([])
   const [format, setFormat] = useState<Format>('poster')
-  const [modal, setModal] = useState<'wallet' | 'guide' | 'preview' | 'receipts' | null>(null)
+  const [modal, setModal] = useState<'wallet' | 'guide' | 'preview' | 'receipts' | 'edit' | 'direction' | 'export' | null>(null)
   const [quote, setQuote] = useState<Quote>()
   const [busy, setBusy] = useState(false)
   const [exporting, setExporting] = useState('')
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [agentOpen, setAgentOpen] = useState(false)
   const [mobileMenu, setMobileMenu] = useState(false)
   const projectsRef = useRef(projects)
   const project = projects.find(item => item.id === activeId) || projects[0]
@@ -33,7 +37,15 @@ export default function App() {
   const artwork = projectOrders.filter(order => order.service === 'image' && order.status === 'delivered').at(-1)?.assetUrl
   const voiceOrder = projectOrders.filter(order => order.service === 'voice' && order.status === 'delivered').at(-1)
   const audio = voiceOrder?.sourceText === project.plan?.narration ? voiceOrder?.assetUrl : undefined
+  const briefingComplete = briefSchema.safeParse(project.brief).success && Boolean(project.briefConfirmed || project.plan)
   const stale = Boolean(project.plan && project.planKey !== contentKey(project.brief))
+  const currentStage = !briefingComplete ? 0 : !project.plan || stale ? 1 : !artwork ? 2 : !audio ? 3 : 5
+  const settledUnits = projectOrders.filter(order => order.settled).reduce((sum, order) => {
+    const [whole, fraction = ''] = order.amount.split('.')
+    return sum + BigInt(whole) * 10n ** 18n + BigInt(fraction.padEnd(18, '0'))
+  }, 0n)
+  const settledDigits = settledUnits.toString().padStart(19, '0')
+  const settledAmount = (settledDigits.slice(0, -18) + '.' + settledDigits.slice(-18)).replace(/\.?0+$/, '') || '0'
 
   const commit = useCallback((next: Project[]) => {
     projectsRef.current = next
@@ -67,6 +79,51 @@ export default function App() {
     const timer = setInterval(() => void refreshOrders(), 2500)
     return () => { alive = false; clearInterval(timer) }
   }, [commit, refreshWallet])
+  function say(text: string, projectId = project.id) {
+    commit(projectsRef.current.map(item => item.id === projectId ? { ...item, messages: [...(item.messages || []), chatMessage('agent', text)].slice(-150) } : item))
+  }
+  function sendMessage(text: string) {
+    const current = projectsRef.current.find(item => item.id === project.id)!
+    const result = respond(current, text)
+    commit(projectsRef.current.map(item => item.id === current.id ? {
+      ...item, brief: result.brief || item.brief, agentField: result.field,
+      briefConfirmed: result.confirmed || item.briefConfirmed,
+      messages: [...(item.messages || []), chatMessage('user', text), chatMessage('agent', result.reply)].slice(-150),
+    } : item))
+    if (result.action && result.action !== 'brief') void agentAction(result.action, false)
+  }
+  async function agentAction(action: AgentAction, announce = true) {
+    setError('')
+    if (action === 'brief') { sendMessage('Build my brief'); return }
+    if (action === 'direction' || action === 'image' || action === 'voice') {
+      if (announce) say('I’ll check the current ' + (action === 'direction' ? 'creative direction' : action) + ' quote. You approve the exact price.')
+      await purchase(action === 'direction' ? 'plan' : action)
+      return
+    }
+    if (action === 'review') {
+      if (!project.plan) { say('Commission creative direction first. Then we can review the image prompt, script, and caption.'); return }
+      setModal('direction'); return
+    }
+    setModal(action === 'edit' ? 'edit' : action)
+  }
+  function openStep(index: number) {
+    if (index === 0) { setAgentOpen(true); return }
+    if (index === 4) { setModal('export'); return }
+    if (index === 1 && project.plan) { setModal('direction'); return }
+    setAgentOpen(true)
+    const label = ['Brief', 'Direction', 'Artwork', 'Voiceover'][index]
+    say(label + ' is selected. ' + (index === 1 || project.plan ? 'Use the matching action below to request a quote.' : 'Complete creative direction first.'))
+  }
+  function saveBrief() {
+    if (!briefSchema.safeParse(project.brief).success) { setError('Complete the required brief fields and a valid budget before saving.'); return }
+    commit(projectsRef.current.map(item => item.id === project.id ? { ...item, briefConfirmed: true } : item))
+    setModal(null)
+  }
+  function confirmCopy() {
+    if (!planSchema.safeParse(project.plan).success) { setError('Complete the image direction, script, and caption first.'); return }
+    commit(projectsRef.current.map(item => item.id === project.id ? { ...item, planKey: contentKey(item.brief) } : item))
+    setModal(null); say('Copy checked against the current brief.')
+  }
   function updateBrief(brief: Brief) {
     commit(projects.map(item => item.id === project.id ? { ...item, brief } : item))
   }
@@ -80,10 +137,11 @@ export default function App() {
   }
   async function purchase(service: Service) {
     setError('')
-    if (!wallet.connected) { setModal('wallet'); return }
+    if (!wallet.connected) { say('Connect your Binance Agentic Wallet first. No payment is made by connecting.'); setModal('wallet'); return }
     if (!briefSchema.safeParse(project.brief).success) { setError('Complete the event name, date, time, venue, call to action, and a budget between 0.0001 and 10 U.'); return }
     if (service !== 'plan' && !planSchema.safeParse(project.plan).success) { setError('Review the creative direction and complete its image prompt, narration, and caption first.'); return }
-    if (service === 'voice' && stale) { setError('Your brief changed. Review the script and use “Copy checked” below the creative direction before buying a voiceover.'); return }
+    if (service === 'voice' && stale) { setError('Your brief changed. Open “Review copy”, check the script, and choose “Copy checked” before buying a voiceover.'); return }
+    if (service === 'plan') commit(projectsRef.current.map(item => item.id === project.id ? { ...item, briefConfirmed: true } : item))
     setBusy(true)
     try { setQuote(await api<Quote>('/quotes', { projectId: project.id, service, brief: project.brief, plan: project.plan })) }
     catch (error) { setError((error as Error).message) }
@@ -96,13 +154,14 @@ export default function App() {
       const order = await api<Order>('/purchases', { quoteId: quote.id, approvedAmount: quote.amount })
       setOrders(previous => previous.some(item => item.id === order.id) ? previous : [...previous, order])
       setQuote(undefined)
-      setNotice('Purchase authorized. Production is running; its receipt will update here.')
+      say('Purchase authorized. I’ll put the delivery and settlement record in this conversation.', order.projectId)
+      setAgentOpen(true)
     } catch (error) { setError((error as Error).message); setQuote(undefined) }
     finally { setBusy(false) }
   }
   async function exportAsset(kind: 'png' | 'zip' | 'video') {
     if (!briefSchema.safeParse(project.brief).success) { setError('Complete the brief before exporting.'); return }
-    if (kind !== 'png' && stale) { setError('Review the copy after your brief changes, then select “Copy checked” before exporting.'); return }
+    if (kind !== 'png' && stale) { setError('Open “Review copy” and check the updated event details before exporting.'); return }
     setExporting(kind); setError(''); setProgress(0)
     try {
       const { campaignZip, canvasBlob, motionPromo, posterCanvas } = await import('./lib/export')
@@ -120,23 +179,34 @@ export default function App() {
     <div className="main-shell">
       <header className="topbar"><div className="flex items-center gap-3 min-w-0"><button className="icon-button mobile-menu" aria-label="Open navigation" onClick={() => setMobileMenu(true)}><Menu size={20} /></button><span className="text-muted hidden sm:inline">Your studio</span><ChevronRight size={14} className="text-muted hidden sm:inline" /><span className="breadcrumb-title">{project.brief.title || 'Untitled campaign'}</span></div><div className="flex items-center gap-4"><button className="icon-button" aria-label="How Commission works" onClick={() => setModal('guide')}><CircleHelp size={18} /></button><span className="topbar-divider" /><button className="wallet-button" onClick={() => setModal('wallet')}><WalletCards size={16} /><span>{wallet.connected ? 'Wallet connected' : 'Connect wallet'}</span><span className={'status-dot ' + (wallet.connected ? 'connected' : '')} /></button></div></header>
       <main id="main-content" className="workspace">
-        <div className="workspace-heading"><div><div className="eyebrow">Event campaign <span> / </span> <span>{artwork ? 'In production' : 'Draft'}</span></div><h1>Make it an occasion.</h1></div><button className="button secondary" disabled={Boolean(exporting)} onClick={() => void exportAsset('zip')}><ArrowDownToLine size={16} /> Export {artwork ? 'campaign' : 'preview'}</button></div>
-        {error && <div className="error-box page-alert" role="alert"><span>{error}</span><button className="icon-button small" aria-label="Dismiss error" onClick={() => setError('')}><X size={16} /></button></div>}
-        {notice && <div className="notice page-alert" role="status"><Check size={17} /><span>{notice}</span><button className="icon-button small ml-auto" aria-label="Dismiss notification" onClick={() => setNotice('')}><X size={16} /></button></div>}
-        {wallet.error && <div className="notice mb-5"><span>{wallet.error}</span><button className="text-button shrink-0" onClick={() => void refreshWallet()}>Check again</button></div>}
-        <div className="studio-grid"><Preview brief={project.brief} artwork={artwork} format={format} onFormat={setFormat} onExport={() => void exportAsset('png')} exporting={Boolean(exporting)} onExpand={() => setModal('preview')} /><BriefEditor brief={project.brief} onChange={updateBrief} onReview={() => void purchase('plan')} busy={busy || projectOrders.some(order => order.status === 'processing')} connected={wallet.connected} hasPlan={Boolean(project.plan)} /></div>
-        <Production plan={project.plan} orders={projectOrders} onPurchase={service => void purchase(service)} busy={busy} artwork={artwork} audio={audio} onZip={() => void exportAsset('zip')} onVideo={() => void exportAsset('video')} onReceipts={() => setModal('receipts')} exporting={exporting} progress={progress} onPlanChange={updatePlan} stale={stale} />
-        {stale && <div className="notice mt-3"><span>Check the script and caption against your updated event details.</span><button className="button secondary shrink-0" onClick={() => commit(projects.map(item => item.id === project.id ? { ...item, planKey: contentKey(item.brief) } : item))}><Check size={15} /> Copy checked</button></div>}
-        {voiceOrder?.assetUrl && !audio && <p className="notice mt-3">The script has changed since the last voiceover. Your old recording remains in receipts; new exports omit it until you purchase the revised script.</p>}
-        <footer className="workspace-footer"><span>Made with intent. Produced with Commission.</span><span>Binance Agentic Wallet <span className="mx-2">·</span> B402 payments</span></footer>
+        <div className="workspace-heading"><div><div className="eyebrow">Event campaign <span>/</span> <span>{currentStage === 5 ? 'Ready' : 'In progress'}</span></div><h1>{project.brief.title || 'Your next gathering'}</h1></div><button className="text-button" onClick={() => setModal('edit')}>Edit brief</button></div>
+        {error && !agentOpen && !modal && !quote && <div className="notice page-alert" role="alert"><span>{error}</span><button className="icon-button small" aria-label="Dismiss error" onClick={() => setError('')}><X size={16} /></button></div>}
+        {notice && <div className="notice page-alert" role="status"><span>{notice}</span><button className="icon-button small" aria-label="Dismiss notification" onClick={() => setNotice('')}><X size={16} /></button></div>}
+        <div className="hero-zone"><Preview brief={project.brief} artwork={artwork} format={format} onFormat={setFormat} onExpand={() => setModal('preview')} /></div>
+        <ProgressStrip current={currentStage} onStep={openStep} />
+        <footer className="campaign-footer"><span>On-chain settlement <strong className={settledUnits > 0n ? 'money' : ''}>{settledAmount} U</strong></span><div><button className="text-button" onClick={() => setModal('receipts')}>Receipts</button><button className="text-button" disabled={Boolean(exporting)} onClick={() => setModal('export')}>Export</button></div></footer>
       </main>
     </div>
+    {!agentOpen && !modal && !quote && <button className="agent-fab" aria-label="Open Agent" onClick={() => setAgentOpen(true)}><Message size={23} /></button>}
+    {agentOpen && !modal && !quote && <AgentPanel key={project.id} project={project} orders={projectOrders} busy={busy} error={error} onSend={sendMessage} onAction={action => void agentAction(action)} onClose={() => setAgentOpen(false)} />}
+    {modal === 'edit' && <Modal title="Edit brief" onClose={() => setModal(null)}><BriefEditor brief={project.brief} onChange={updateBrief} onReview={saveBrief} busy={busy} />{error && <p className="notice mt-4" role="alert">{error}</p>}</Modal>}
+    {modal === 'direction' && project.plan && <Modal title="Creative direction" onClose={() => setModal(null)}><DirectionEditor plan={project.plan} stale={stale} onChange={updatePlan} onConfirm={confirmCopy} />{error && <p className="notice mt-4" role="alert">{error}</p>}</Modal>}
+    {modal === 'export' && <Modal title="Export campaign" onClose={() => setModal(null)}><div className="export-options">
+      <p className="text-muted">{artwork ? 'Your campaign files, with purchased artwork.' : 'Layout previews. Original artwork has not been purchased.'}</p>
+      <button className="button primary" disabled={Boolean(exporting)} onClick={() => void exportAsset('zip')}>{exporting === 'zip' ? 'Packing…' : 'Download campaign ZIP'}<ArrowDownToLine size={16} /></button>
+      <button className="text-button" disabled={Boolean(exporting)} onClick={() => void exportAsset('png')}>Export {format} PNG</button>
+      <button className="text-button" disabled={Boolean(exporting)} onClick={() => void exportAsset('video')}>{exporting === 'video' ? 'Rendering ' + progress + '%' : audio ? 'Export narrated promo · WebM' : 'Export silent preview · WebM'}</button>
+      <button className="text-button" onClick={() => project.plan ? setModal('direction') : (setModal(null), setAgentOpen(true))}>Review copy</button>
+      {voiceOrder?.assetUrl && !audio && <p className="footnote">The script changed. The previous voiceover is omitted from new exports.</p>}
+      {exporting === 'video' && <p className="footnote" role="status">Keep this tab visible while the video records.</p>}
+      {error && <p className="notice" role="alert">{error}</p>}
+    </div></Modal>}
     {modal === 'wallet' && <WalletDialog wallet={wallet} onRefresh={refreshWallet} onClose={() => setModal(null)} />}
     {quote && <PurchaseDialog quote={quote} onClose={() => { if (!busy) setQuote(undefined) }} onApprove={() => void approve()} busy={busy} />}
     {modal === 'preview' && <Modal title={project.brief.title} onClose={() => setModal(null)}><div className="expanded-poster"><Poster brief={project.brief} format={format} artwork={artwork} /></div><p className="footnote mt-3">{artwork ? 'Purchased artwork with editable event details.' : 'Local layout preview. Original artwork has not been purchased.'}</p></Modal>}
     {modal === 'guide' && <Modal title="A small brief. A whole campaign." onClose={() => setModal(null)}><ol className="setup-steps"><li><span>1</span><div><strong>Make the brief yours</strong><p>Set your event details and budget. Explore the poster and story layouts free.</p></div></li><li><span>2</span><div><strong>Commission the creative direction</strong><p>Connect Binance Agentic Wallet. Review a live Xona quote; the agent buys a concept, art direction, script, and caption using B402.</p></div></li><li><span>3</span><div><strong>Approve the production</strong><p>Edit the direction, then commission original artwork and a voiceover. Each purchase has its own exact-price approval and receipt.</p></div></li><li><span>4</span><div><strong>Leave with real files</strong><p>Download your PNG poster, story, caption, voiceover, and receipts as a ZIP. Export the vertical narrated promo separately as WebM. Date and venue edits reuse your artwork.</p></div></li></ol><p className="footnote">This workspace runs on your computer. Keep the local service running for wallet connection and production. Live delivery depends on Binance and Xona; preview exports work without a funded wallet.</p><a className="text-button mt-5" href="https://github.com/binance/binance-skills-hub/tree/main/skills/binance-web3/binance-agentic-wallet" target="_blank" rel="noreferrer">Official Binance Wallet documentation <ArrowUpRight size={15} /></a></Modal>}
     {modal === 'receipts' && <Modal title="Campaign receipts" onClose={() => setModal(null)}>
-      {!projectOrders.length ? <div className="empty-state"><ReceiptText size={32} /><h3>No purchases yet</h3><p>Layout previews are free. Paid services will appear here with their real delivery and settlement status.</p></div> : <div className="receipt-list">{projectOrders.map(order => <article key={order.id}><div className="flex justify-between gap-3"><strong>{serviceNames[order.service]}</strong><strong>{order.amount} U</strong></div><p>{new Date(order.createdAt).toLocaleString()} · {order.status === 'uncertain' ? 'Needs review' : order.status}</p><p>{order.settled ? 'Settlement reported by provider' : 'On-chain settlement not confirmed'}</p>{order.error && <p className="text-red-700">{order.error}</p>}{order.settlement && <a className="text-button" href={'https://bscscan.com/tx/' + order.settlement} target="_blank" rel="noreferrer">View transaction <ArrowUpRight size={14} /></a>}{order.recoverable && order.status === 'uncertain' && <button className="text-button mt-2" disabled={busy} onClick={() => {
+      {!projectOrders.length ? <div className="empty-state"><ReceiptText size={32} /><h3>No purchases yet</h3><p>Layout previews are free. Paid services will appear here with their real delivery and settlement status.</p></div> : <div className="receipt-list">{projectOrders.map(order => <article key={order.id}><div className="flex justify-between gap-3"><strong>{serviceNames[order.service]}</strong><strong className="money">{order.amount} U</strong></div><p>{new Date(order.createdAt).toLocaleString()} · {order.status === 'uncertain' ? 'Needs review' : order.status}</p><p>{order.settled ? 'Settlement reported by provider' : 'On-chain settlement not confirmed'}</p>{order.error && <p className="receipt-error">{order.error}</p>}{order.settlement && <a className="text-button" href={'https://bscscan.com/tx/' + order.settlement} target="_blank" rel="noreferrer">View transaction <ArrowUpRight size={14} /></a>}{order.recoverable && order.status === 'uncertain' && <button className="text-button mt-2" disabled={busy} onClick={() => {
         setBusy(true)
         void api<Order>('/orders/' + order.id + '/recover', {}).then(result => {
           setOrders(previous => previous.map(item => item.id === result.id ? result : item))

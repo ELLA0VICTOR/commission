@@ -13,8 +13,9 @@ function lines(text: string, limit: number) {
 export function Poster({ brief, format, artwork, layer = 'all' }: { brief: Brief; format: Format; artwork?: string; layer?: 'all' | 'art' | 'type' }) {
   const clipId = useId().replaceAll(':', '')
   const height = format === 'story' ? 1600 : 1200
-  const palettes = { 'After dark': ['#17120c', '#f3ede0', '#c9a65c'], 'Open air': ['#222217', '#eee9da', '#bba975'], 'Gallery opening': ['#2b1b16', '#f1e6d5', '#bd935e'] }
-  const [background, ink, accent] = palettes[brief.direction]
+  const background = 'var(--bg-raised)'
+  const ink = 'var(--text-primary)'
+  const accent = 'var(--accent-gold)'
   const headline = lines(brief.title.toUpperCase() || 'YOUR EVENT', 9)
   const fontSize = Math.min(147, 770 / Math.max(...headline.map(line => line.length)) * 1.55)
   return <svg data-testid="campaign-poster" xmlns="http://www.w3.org/2000/svg" viewBox={'0 0 900 ' + height} role="img" aria-label={brief.title + ' campaign ' + format} style={{ fontFamily: '"Hanken Grotesk Variable", sans-serif' }}>
@@ -35,15 +36,15 @@ export function Poster({ brief, format, artwork, layer = 'all' }: { brief: Brief
         <circle cx="736" cy={height * .4} r="35" fill={ink} />
       </>}
       </>}
-      {layer !== 'art' && <><text className="poster-kicker" x="62" y="77" fontSize="18" fontWeight="600" letterSpacing="3" fill={ink}>AN INDEPENDENT GATHERING</text>
-      <path d="M788 54h42m-21-21v42" stroke={ink} strokeWidth="2" />
-      {headline.map((line, index) => <text className="poster-title" key={index} x="54" y={207 + index * fontSize * .88} fontSize={fontSize} fontWeight="850" letterSpacing="-5" fill={ink}>{line}</text>)}
+      {layer !== 'art' && <><text className="poster-kicker" x="62" y="77" fontSize="18" fontWeight="600" letterSpacing="3" fill={accent}>AN INDEPENDENT GATHERING</text>
+      <path d="M788 54h42m-21-21v42" stroke={accent} strokeWidth="2" />
+      {headline.map((line, index) => <text className="poster-title" key={index} x="54" y={207 + index * fontSize * .88} fontSize={fontSize} fontWeight="850" letterSpacing="-5" fill={headline.length > 1 && index === headline.length - 1 ? accent : ink}>{line}</text>)}
       {lines(brief.subtitle, 42).map((line, index) => <text className="poster-tagline" key={index} x="63" y={238 + (headline.length - 1) * fontSize * .88 + index * 30} fontSize="24" fill={ink}>{line}</text>)}
       <g className="poster-footer"><rect x="0" y={height - 204} width="900" height="204" fill={background} />
-      <path d={'M62 ' + (height - 192) + 'H838'} stroke={ink} strokeOpacity=".35" />
+      <path d={'M62 ' + (height - 192) + 'H838'} stroke={accent} strokeOpacity=".5" />
       <text x="62" y={height - 148} fill={ink} fontSize="27" fontWeight="650">{dateLabel(brief.date)} · {brief.time}</text>
       {lines(brief.venue, 46).slice(0, 2).map((line, i) => <text key={i} x="62" y={height - 104 + i * 30} fill={ink} fontSize="24">{line}</text>)}
-      <text x="62" y={height - 39} fill={ink} fontSize="21" fontWeight="600">{brief.callToAction} ↗</text>
+      <text x="62" y={height - 39} fill={accent} fontSize="21" fontWeight="600">{brief.callToAction} ↗</text>
       <text x="838" y={height - 39} textAnchor="end" fill={ink} fontSize="18">COME AS YOU ARE.</text></g>
       </>}
     </g>
