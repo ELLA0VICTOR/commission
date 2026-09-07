@@ -1,6 +1,7 @@
+import type { Order } from '../shared/domain.ts'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { assertBudget, decimal, MERCHANT, requestBody, samePaymentAccept, units, U_TOKEN, validateAccept } from '../server/policy.ts'
+import { assertBudget, assertPurchaseState, decimal, MERCHANT, requestBody, samePaymentAccept, units, U_TOKEN, validateAccept } from '../server/policy.ts'
 import { defaultBrief } from '../shared/domain.ts'
 
 const valid = { scheme: 'exact', network: 'eip155:56', asset: U_TOKEN, payTo: MERCHANT, amount: '50000000000000000', extra: { assetTransferMethod: 'eip3009' } }
@@ -41,4 +42,18 @@ test('matches normalized wallet payment terms despite removed metadata and reord
   ]) assert.equal(samePaymentAccept(provider, { ...wallet, ...patch }), false)
   assert.equal(samePaymentAccept({ ...provider, maxTimeoutSeconds: 60 }, wallet), false)
   assert.equal(samePaymentAccept({ ...provider, maxTimeoutSeconds: 60 }, { ...wallet, maxTimeoutSeconds: 60 }), true)
+})
+
+test('voice retry requires an explicit failed-order reference and cannot duplicate a retry', () => {
+  const failed: Order = { id: 'failed', projectId: 'campaign', service: 'voice', inputKey: 'old', status: 'uncertain', amount: '0.01', token: 'U', createdAt: new Date().toISOString(), settled: false }
+  assert.throws(() => assertPurchaseState([failed], 'campaign', 'voice'), /unresolved/)
+  assert.doesNotThrow(() => assertPurchaseState([failed], 'campaign', 'voice', 'failed'))
+  for (const changed of [{ status: 'processing' }, { status: 'delivered' }, { recoverable: true }, { projectId: 'other' }, { service: 'image' }])
+    assert.throws(() => assertPurchaseState([{ ...failed, ...changed } as Order], 'campaign', 'voice', 'failed'), /cannot be retried/)
+  const retry: Order = { ...failed, id: 'retry', inputKey: 'adjusted', retryOf: 'failed', status: 'processing' }
+  assert.throws(() => assertPurchaseState([failed, retry], 'campaign', 'voice', 'failed'), /cannot be retried/)
+  assert.throws(() => assertPurchaseState([failed, retry], 'campaign', 'voice'), /unresolved/)
+  assert.doesNotThrow(() => assertPurchaseState([failed, { ...retry, status: 'delivered' }], 'campaign', 'voice'))
+  const plan = { concept: 'Campaign concept.', imagePrompt: 'A quiet rooftop without any text.', narration: 'Join us on the rooftop for an evening of music.', caption: 'An evening on the rooftop.' }
+  assert.deepEqual(requestBody('voice', defaultBrief, plan), { text: plan.narration, voice_id: 'eve', language: 'en' })
 })

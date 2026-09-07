@@ -32,7 +32,12 @@ export async function fulfill(quote: FulfillmentQuote, order: Order, deps: Fulfi
       recordBodySettlement(raw, order)
       await deps.persist()
     }
-    if (!response.ok) throw new Error('Provider returned HTTP ' + response.status + ' after authorization. ' + (order.settled ? 'Payment settled, but delivery failed.' : 'Payment may have settled; do not repeat it blindly.'))
+    if (!response.ok) {
+      const providerMessage = raw && typeof raw === 'object' && 'message' in raw && typeof raw.message === 'string' ? raw.message : ''
+      if (/TTS error 403/i.test(providerMessage) && /used all available credits|reached its monthly spending limit/i.test(providerMessage))
+        throw new Error('The Xona speech provider is out of credits or has reached its spending limit. ' + (order.settled ? 'Payment settled, but no audio was delivered. ' : 'Payment may have settled. ') + 'Do not retry until the provider restores service.')
+      throw new Error('Provider returned HTTP ' + response.status + ' after authorization. ' + (order.settled ? 'Payment settled, but delivery failed.' : 'Payment may have settled; do not repeat it blindly.'))
+    }
     if (raw === undefined) throw new Error('Provider returned an unreadable response after authorization. Check settlement before retrying.')
     order.recoverable = true
     await deps.persist()

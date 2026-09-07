@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util'
 import { createHash } from 'node:crypto'
-import type { Brief, Plan, Service } from '../shared/domain.ts'
+import type { Brief, Order, Plan, Service } from '../shared/domain.ts'
 
 export const U_TOKEN = '0xcE24439F2D9C6a2289F741120FE202248B666666'
 export const MERCHANT = '0x515e7Bce44Baa5F6e42D16d4B5f27768E7f2F8cC'
@@ -31,7 +31,7 @@ export function requestBody(service: Service, brief: Brief, plan?: Plan) {
     prompt: plan.imagePrompt + '. Vertical editorial composition. No words, letters, logos, watermarks or typography.',
     aspect_ratio: '3:4', resolution: '1 MP', output_format: 'png',
   }
-  return { text: plan.narration, voice_id: 'Eve' }
+  return { text: plan.narration, voice_id: 'eve', language: 'en' }
 }
 export function validateAccept(accept: Record<string, unknown>) {
   const extra = accept.extra as Record<string, unknown> | undefined
@@ -57,4 +57,16 @@ export function samePaymentAccept(provider: Record<string, unknown>, wallet: Rec
     maxTimeoutSeconds: accept.maxTimeoutSeconds, extra: accept.extra,
   })
   return isDeepStrictEqual(terms(provider), terms(wallet))
+}
+
+export function assertPurchaseState(orders: Order[], projectId: string, service: Service, retryOf?: string) {
+  if (retryOf) {
+    const previous = orders.find(order => order.id === retryOf)
+    if (!previous || previous.projectId !== projectId || previous.service !== service || service !== 'voice' ||
+      previous.status !== 'uncertain' || previous.recoverable || orders.some(order => order.retryOf === retryOf))
+      throw new Error('This failed voice purchase cannot be retried. Check its saved delivery and retry history.')
+  }
+  const blocked = orders.some(order => order.projectId === projectId && order.status !== 'delivered' &&
+    order.id !== retryOf && !orders.some(replacement => replacement.retryOf === order.id && replacement.status === 'delivered'))
+  if (blocked) throw new Error('This campaign has a pending or unresolved purchase. Check its receipt before starting another.')
 }

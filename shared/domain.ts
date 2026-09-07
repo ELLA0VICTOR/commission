@@ -29,7 +29,7 @@ export type Order = {
   id: string; projectId: string; service: Service; inputKey: string;
   status: 'processing' | 'delivered' | 'uncertain';
   amount: string; token: string; createdAt: string; settlement?: string;
-  settled: boolean; recoverable?: boolean; briefSnapshot?: Brief; sourceText?: string; assetUrl?: string; plan?: Plan; error?: string;
+  settled: boolean; recoverable?: boolean; retryOf?: string; briefSnapshot?: Brief; sourceText?: string; assetUrl?: string; plan?: Plan; error?: string;
 }
 export type Wallet = { connected: boolean; address?: string; error?: string }
 export const serviceNames: Record<Service, string> = {

@@ -4,7 +4,7 @@ import { randomUUID, randomBytes } from 'node:crypto'
 import { resolve } from 'node:path'
 import { z } from 'zod'
 import { briefSchema, planSchema, type Order, type Quote, type Brief } from '../shared/domain.ts'
-import { assertBudget, decimal, endpoints, fingerprint, MERCHANT, requestBody, samePaymentAccept, units, U_TOKEN, validateAccept } from './policy.ts'
+import { assertBudget, assertPurchaseState, decimal, endpoints, fingerprint, MERCHANT, requestBody, samePaymentAccept, units, U_TOKEN, validateAccept } from './policy.ts'
 import { baw } from './wallet.ts'
 import { assetDir, initStore, orders, persist, saveResponse, readResponse } from './store.ts'
 import { getRequirements, merchantRequest, parsePlan, saveAsset } from './provider.ts'
@@ -76,9 +76,9 @@ app.post('/api/wallet/disconnect', async (_req, res) => {
 
 const purchaseSchema = z.object({
   projectId: z.string().uuid(), service: z.enum(['plan', 'image', 'voice']),
-  brief: briefSchema, plan: planSchema.optional(),
+  brief: briefSchema, plan: planSchema.optional(), retryOf: z.string().uuid().optional(),
 })
-type InternalQuote = Quote & { paymentId: string; index: number; body: unknown; inputKey: string; budget: string; brief: Brief }
+type InternalQuote = Quote & { paymentId: string; index: number; body: unknown; inputKey: string; budget: string; brief: Brief; retryOf?: string }
 const quotes = new Map<string, InternalQuote>()
 type WalletOption = {
   index: number; status: string; reasons?: string[]; tokenAddress: string; payTo: string;
@@ -91,8 +91,7 @@ function publicQuote(quote: InternalQuote): Quote {
 }
 app.post('/api/quotes', async (req, res) => {
   const input = purchaseSchema.parse(req.body)
-  if (orders.some(order => order.projectId === input.projectId && (order.status === 'processing' || order.status === 'uncertain')))
-    throw new Error('This campaign has a pending or unresolved purchase. Check its receipt before starting another.')
+  assertPurchaseState(orders, input.projectId, input.service, input.retryOf)
   const body = requestBody(input.service, input.brief, input.plan)
   const inputKey = fingerprint(body)
   if (orders.some(order => order.projectId === input.projectId && order.service === input.service && order.inputKey === inputKey && order.status === 'delivered'))
@@ -119,7 +118,7 @@ app.post('/api/quotes', async (req, res) => {
     id: randomUUID(), projectId: input.projectId, service: input.service, amount: decimal(units(option.amount)),
     token: 'U', tokenAddress: U_TOKEN, payTo: option.payTo, expiresAt: Date.now() + 120_000,
     ready: option.status === 'READY_TO_SIGN', reasons: option.reasons || [],
-    paymentId: preview.paymentId, index: option.index, body, inputKey, budget: input.brief.budget, brief: input.brief,
+    paymentId: preview.paymentId, index: option.index, body, inputKey, budget: input.brief.budget, brief: input.brief, retryOf: input.retryOf,
   }
   quotes.set(quote.id, quote)
   res.json(publicQuote(quote))
@@ -132,15 +131,14 @@ app.post('/api/purchases', async (req, res) => {
   const quote = quotes.get(quoteId)
   if (!quote || quote.expiresAt <= Date.now()) throw new Error('This quote expired. Request a fresh quote before approving.')
   if (!quote.ready || quote.amount !== approvedAmount) throw new Error('This exact payment has not been approved or is not ready.')
-  if (orders.some(order => order.projectId === quote.projectId && order.status !== 'delivered'))
-    throw new Error('An earlier purchase needs attention. No new payment was signed.')
+  assertPurchaseState(orders, quote.projectId, quote.service, quote.retryOf)
   if (orders.some(order => order.projectId === quote.projectId && order.service === quote.service && order.inputKey === quote.inputKey))
     throw new Error('This exact production request already has a receipt. Reuse it instead of paying again.')
   assertBudget(quote.budget, orders.filter(order => order.projectId === quote.projectId).map(order => order.amount), quote.amount)
   const order: Order = {
     id: quote.id, projectId: quote.projectId, service: quote.service, inputKey: quote.inputKey,
     status: 'processing', amount: quote.amount, token: quote.token, createdAt: new Date().toISOString(), settled: false,
-    briefSnapshot: quote.brief, sourceText: quote.service === 'voice' ? (quote.body as { text: string }).text : undefined,
+    retryOf: quote.retryOf, briefSnapshot: quote.brief, sourceText: quote.service === 'voice' ? (quote.body as { text: string }).text : undefined,
   }
   // Reserve and persist before signing. Duplicate clicks and restarted servers cannot sign twice.
   orders.push(order)

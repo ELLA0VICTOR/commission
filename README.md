@@ -101,7 +101,7 @@ The provider-check script sends **unsigned requests only**. On September 6, 2026
 - server — local wallet adapter, payment policy, provider transport, durable receipts, and recovery.
 - tests — payment failure tests and real-browser workflow checks.
 
-The interface uses one warm charcoal-and-champagne-gold theme, Tailwind CSS, locally bundled Hanken Grotesk, custom line-art SVG glyphs, and custom SVG artwork. The live invitation leads the layout, above a five-step progress strip and settlement footer. The floating Agent panel handles briefing and production; settled purchases appear as inline receipts. A CSS-only assembly sequence respects reduced-motion preferences and does not affect exported files. Preview artwork is code-generated; paid artwork comes from the selected provider.
+The interface uses one pure-black, neutral-charcoal, and bright-gold theme, Tailwind CSS, locally bundled Hanken Grotesk, custom line-art SVG glyphs, and custom SVG artwork. The live invitation leads the layout, above a five-step progress strip and settlement footer. The floating Agent panel handles briefing and production; settled purchases appear as inline receipts. A CSS-only assembly sequence respects reduced-motion preferences and does not affect exported files. Preview artwork is code-generated; paid artwork comes from the selected provider.
 
 ## Integration references
 

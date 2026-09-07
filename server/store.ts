@@ -17,8 +17,14 @@ export async function initStore() {
     order.error = 'The server restarted during this purchase. Check the wallet transaction history before making another purchase.'
   }
   // Restore receipts already saved in provider bodies, without calling or paying the provider.
-  for (const order of orders) if (!order.settled) {
-    try { recordBodySettlement(await readResponse(order.id), order) }
+  for (const order of orders) {
+    try {
+      const raw = await readResponse(order.id)
+      if (!order.settled) recordBodySettlement(raw, order)
+      if (order.service === 'voice' && order.status === 'uncertain' && raw && typeof raw === 'object' && 'message' in raw && typeof raw.message === 'string' &&
+        /TTS error 403/i.test(raw.message) && /used all available credits|reached its monthly spending limit/i.test(raw.message))
+        order.error = 'The Xona speech provider is out of credits or has reached its spending limit. ' + (order.settled ? 'Payment settled, but no audio was delivered. ' : 'Payment may have settled. ') + 'Do not retry until the provider restores service.'
+    }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
   }
   await persist()

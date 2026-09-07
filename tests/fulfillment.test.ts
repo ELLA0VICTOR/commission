@@ -94,3 +94,11 @@ test('preserves failed provider JSON and payment evidence without enabling a rec
   assert.equal(current.status, 'uncertain'); assert.equal(current.settled, true)
   assert.equal(current.recoverable, undefined); assert.match(current.error!, /Payment settled, but delivery failed/)
 })
+
+test('explains a provider credit failure without exposing provider account identifiers', async () => {
+  const current = order()
+  await fulfill({ ...quote, service: 'voice' }, current, deps({ request: async () => new Response(JSON.stringify({ message: 'TTS error 403: Your team private-team has either used all available credits or reached its monthly spending limit.', payment: bodyPayment() }), { status: 500 }) }))
+  assert.equal(current.status, 'uncertain'); assert.equal(current.settled, true)
+  assert.match(current.error!, /speech provider is out of credits/)
+  assert.doesNotMatch(current.error!, /private-team/)
+})
