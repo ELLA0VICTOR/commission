@@ -34,3 +34,12 @@ export const ShieldCheck = glyph(<path d="M12 2 3 6v6c0 5 9 10 9 10s9-5 9-10V6l-
 export const Message = glyph(<path d="M3 4h18v13H9l-6 4V4Zm4 5h10M7 13h6" />)
 export const Send = glyph(<path d="m3 11 18-8-8 18-2-8-8-2Zm8 2L21 3" />)
 export const LogoMark = glyph(<><path d="M18 6H10a6 6 0 0 0 0 12h8v-4h-8a2 2 0 0 1 0-4h8z" fill="var(--accent-gold)" stroke="none" /><path d="M17 9h5v6h-5z" fill="var(--text-primary)" stroke="none" /></>)
+
+// An open orbital seal around a focused core: the studio's production agent.
+export const AgentMark = glyph(<>
+  <path d="M12 2.5a9.5 9.5 0 0 1 9.5 9.5M12 21.5A9.5 9.5 0 0 1 2.5 12" />
+  <path d="m7 8 5-3 5 3v8l-5 3-5-3V8Z" />
+  <path d="m7 8 5 3 5-3m-5 3v8" opacity=".5" />
+  <circle cx="3.7" cy="7.4" r="1" fill="currentColor" stroke="none" />
+  <circle cx="20.3" cy="16.6" r="1" fill="currentColor" stroke="none" />
+</>)

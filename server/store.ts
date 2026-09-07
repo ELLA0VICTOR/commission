@@ -1,3 +1,4 @@
+import { recordBodySettlement } from './settlement.ts'
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import type { Order } from '../shared/domain.ts'
@@ -14,6 +15,11 @@ export async function initStore() {
   for (const order of orders) if (order.status === 'processing') {
     order.status = 'uncertain'
     order.error = 'The server restarted during this purchase. Check the wallet transaction history before making another purchase.'
+  }
+  // Restore receipts already saved in provider bodies, without calling or paying the provider.
+  for (const order of orders) if (!order.settled) {
+    try { recordBodySettlement(await readResponse(order.id), order) }
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error }
   }
   await persist()
 }

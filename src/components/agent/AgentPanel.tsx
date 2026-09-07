@@ -2,11 +2,11 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { serviceNames, type Order, type Project } from '../../../shared/domain'
 import type { AgentAction } from '../../lib/conversation'
 import { Modal } from '../ui/Modal'
-import { ArrowUpRight, LoaderCircle, ReceiptText, Send } from '../ui/Icons'
+import { AgentMark, ArrowUpRight, LoaderCircle, ReceiptText, Send } from '../ui/Icons'
 const actions: [AgentAction, string][] = [['brief', 'Build my brief'], ['direction', 'Direction'], ['image', 'Artwork'], ['voice', 'Voiceover'], ['review', 'Review copy'], ['wallet', 'Wallet'], ['export', 'Export']]
-export function AgentPanel({ project, orders, busy, error, onSend, onAction, onClose }: {
+export function AgentPanel({ project, orders, busy, error, onSend, onAction, onClose, onClear }: {
   project: Project; orders: Order[]; busy: boolean; error: string; onSend: (text: string) => void;
-  onAction: (action: AgentAction) => void; onClose: () => void;
+  onAction: (action: AgentAction) => void; onClose: () => void; onClear: () => void;
 }) {
   const [text, setText] = useState('')
   const end = useRef<HTMLDivElement>(null)
@@ -18,7 +18,7 @@ export function AgentPanel({ project, orders, busy, error, onSend, onAction, onC
     if (!text.trim() || busy) return
     onSend(text.trim()); setText('')
   }
-  return <Modal title="Agent" className="agent-panel" onClose={onClose}>
+  return <Modal title={<span className="agent-identity"><AgentMark size={30} strokeWidth={1.2} /><span>Agent</span></span>} className="agent-panel" onClose={onClose} actions={<button className="text-button" disabled={busy || (!messages.length && !project.agentField && !error && !text)} title="Clear messages; keep campaign files and receipts" onClick={() => { setText(''); onClear() }}>Clear chat</button>}>
     <div className="agent-status"><span className="agent-online-dot" />{busy ? 'Working' : 'Ready'}<span className="agent-mode">Local briefing · B402 production</span></div>
     <div className="conversation" role="log" aria-label="Campaign conversation" aria-live="polite" aria-relevant="additions text">
       <div className="chat-message incoming">Tell me about your event, or choose “Build my brief”. I can update the preview and commission creative services. You approve every payment.</div>

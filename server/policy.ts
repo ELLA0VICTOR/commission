@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util'
 import { createHash } from 'node:crypto'
 import type { Brief, Plan, Service } from '../shared/domain.ts'
 
@@ -43,4 +44,17 @@ export function validateAccept(accept: Record<string, unknown>) {
 export function assertBudget(budget: string, amounts: string[], next: string) {
   if (amounts.reduce((sum, amount) => sum + units(amount), 0n) + units(next) > units(budget))
     throw new Error('This purchase would exceed the campaign budget. Increase it explicitly in the brief.')
+}
+
+// Binance returns normalized v2 accepts: descriptive/legacy fields are omitted
+// and object keys can be reordered. Compare payment terms, including all extra
+// signing data, without changing the original challenge sent to the wallet.
+export function samePaymentAccept(provider: Record<string, unknown>, wallet: Record<string, unknown>) {
+  if (!validateAccept(provider) || !validateAccept(wallet)) return false
+  const terms = (accept: Record<string, unknown>) => ({
+    scheme: accept.scheme, network: accept.network, asset: accept.asset,
+    amount: accept.amount, payTo: accept.payTo,
+    maxTimeoutSeconds: accept.maxTimeoutSeconds, extra: accept.extra,
+  })
+  return isDeepStrictEqual(terms(provider), terms(wallet))
 }

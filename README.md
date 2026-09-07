@@ -63,7 +63,7 @@ The server requests an unsigned HTTP 402 challenge from a fixed Xona endpoint, p
 - Purchase intent is persisted before signing. Duplicate requests reuse the existing receipt. An unresolved purchase blocks further purchases in that campaign.
 - A signed request is sent once. An ambiguous network error does not trigger another payment.
 - Provider responses are saved before asset parsing/download. When a response exists, **Retry saved delivery** can retry parsing/downloading it without calling the wallet or making another payment.
-- Delivery and settlement are separate. A file is not labelled settled simply because it arrived. Receipt links use a transaction hash from the provider's PAYMENT-RESPONSE header; the app does not independently verify blockchain finality.
+- Delivery and settlement are separate. A file is not labelled settled simply because it arrived. Receipt links use a transaction hash from the provider's PAYMENT-RESPONSE header or a validated B402 payment object in its response body; the app does not independently verify blockchain finality.
 - If a response was lost after authorization, inspect the Binance wallet transaction history and contact the provider as necessary. This version does not automatically reconcile that case or issue refunds.
 
 The provider's merchant address is pinned to the address verified during development. Any change requires an explicit integration review.

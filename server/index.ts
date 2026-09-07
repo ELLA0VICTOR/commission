@@ -4,7 +4,7 @@ import { randomUUID, randomBytes } from 'node:crypto'
 import { resolve } from 'node:path'
 import { z } from 'zod'
 import { briefSchema, planSchema, type Order, type Quote, type Brief } from '../shared/domain.ts'
-import { assertBudget, decimal, endpoints, fingerprint, MERCHANT, requestBody, units, U_TOKEN, validateAccept } from './policy.ts'
+import { assertBudget, decimal, endpoints, fingerprint, MERCHANT, requestBody, samePaymentAccept, units, U_TOKEN, validateAccept } from './policy.ts'
 import { baw } from './wallet.ts'
 import { assetDir, initStore, orders, persist, saveResponse, readResponse } from './store.ts'
 import { getRequirements, merchantRequest, parsePlan, saveAsset } from './provider.ts'
@@ -109,7 +109,7 @@ app.post('/api/quotes', async (req, res) => {
     validateAccept(item.originalAccept) && item.tokenAddress?.toLowerCase() === U_TOKEN.toLowerCase() &&
     item.payTo?.toLowerCase() === MERCHANT.toLowerCase() && item.binanceChainId === '56' &&
     item.scheme === 'exact' && item.assetTransferMethod === 'eip3009' && item.needApproveFirst === false &&
-    eligible.some(accept => fingerprint(accept) === fingerprint(item.originalAccept)) &&
+    eligible.some(accept => samePaymentAccept(accept, item.originalAccept)) &&
     units(item.amount) === BigInt(item.originalAccept.amount as string),
   )
   if (!option) throw new Error('The wallet could not validate a supported payment option. No payment was signed.')

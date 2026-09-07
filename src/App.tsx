@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowDownToLine, ArrowUpRight, ChevronRight, CircleHelp, Menu, Message, ReceiptText, WalletCards, X } from './components/ui/Icons'
+import { ArrowDownToLine, ArrowUpRight, ChevronRight, CircleHelp, Menu, Message, ReceiptText, X } from './components/ui/Icons'
 import { briefSchema, planSchema, serviceNames, type Brief, type Order, type Plan, type Project, type Quote, type Service, type Wallet } from '../shared/domain'
 import { Sidebar } from './components/layout/Sidebar'
 import { BriefEditor } from './components/campaign/BriefEditor'
@@ -10,6 +10,7 @@ import { DirectionEditor } from './components/campaign/DirectionEditor'
 import { AgentPanel } from './components/agent/AgentPanel'
 import { chatMessage, respond, type AgentAction } from './lib/conversation'
 import { WalletDialog } from './components/wallet/WalletDialog'
+import { WalletControl } from './components/wallet/WalletControl'
 import { PurchaseDialog } from './components/wallet/PurchaseDialog'
 import { Modal } from './components/ui/Modal'
 import { api } from './lib/api'
@@ -81,6 +82,10 @@ export default function App() {
   }, [commit, refreshWallet])
   function say(text: string, projectId = project.id) {
     commit(projectsRef.current.map(item => item.id === projectId ? { ...item, messages: [...(item.messages || []), chatMessage('agent', text)].slice(-150) } : item))
+  }
+  function clearChat() {
+    setError('')
+    commit(projectsRef.current.map(item => item.id === project.id ? { ...item, messages: [], agentField: undefined } : item))
   }
   function sendMessage(text: string) {
     const current = projectsRef.current.find(item => item.id === project.id)!
@@ -177,7 +182,7 @@ export default function App() {
     {mobileMenu && <button className="sidebar-scrim" aria-label="Close navigation" onClick={() => setMobileMenu(false)} />}
     <Sidebar projects={projects} activeId={project.id} onSelect={id => { setActiveId(id); setMobileMenu(false) }} onCreate={newProject} wallet={wallet} onWallet={() => setModal('wallet')} onGuide={() => setModal('guide')} />
     <div className="main-shell">
-      <header className="topbar"><div className="flex items-center gap-3 min-w-0"><button className="icon-button mobile-menu" aria-label="Open navigation" onClick={() => setMobileMenu(true)}><Menu size={20} /></button><span className="text-muted hidden sm:inline">Your studio</span><ChevronRight size={14} className="text-muted hidden sm:inline" /><span className="breadcrumb-title">{project.brief.title || 'Untitled campaign'}</span></div><div className="flex items-center gap-4"><button className="icon-button" aria-label="How Commission works" onClick={() => setModal('guide')}><CircleHelp size={18} /></button><span className="topbar-divider" /><button className="wallet-button" onClick={() => setModal('wallet')}><WalletCards size={16} /><span>{wallet.connected ? 'Wallet connected' : 'Connect wallet'}</span><span className={'status-dot ' + (wallet.connected ? 'connected' : '')} /></button></div></header>
+      <header className="topbar"><div className="flex items-center gap-3 min-w-0"><button className="icon-button mobile-menu" aria-label="Open navigation" onClick={() => setMobileMenu(true)}><Menu size={20} /></button><span className="text-muted hidden sm:inline">Your studio</span><ChevronRight size={14} className="text-muted hidden sm:inline" /><span className="breadcrumb-title">{project.brief.title || 'Untitled campaign'}</span></div><div className="flex items-center gap-4"><button className="icon-button" aria-label="How Commission works" onClick={() => setModal('guide')}><CircleHelp size={18} /></button><span className="topbar-divider" /><WalletControl key={wallet.address || 'disconnected'} wallet={wallet} onOpen={() => setModal('wallet')} /></div></header>
       <main id="main-content" className="workspace">
         <div className="workspace-heading"><div><div className="eyebrow">Event campaign <span>/</span> <span>{currentStage === 5 ? 'Ready' : 'In progress'}</span></div><h1>{project.brief.title || 'Your next gathering'}</h1></div><button className="text-button" onClick={() => setModal('edit')}>Edit brief</button></div>
         {error && !agentOpen && !modal && !quote && <div className="notice page-alert" role="alert"><span>{error}</span><button className="icon-button small" aria-label="Dismiss error" onClick={() => setError('')}><X size={16} /></button></div>}
@@ -188,7 +193,7 @@ export default function App() {
       </main>
     </div>
     {!agentOpen && !modal && !quote && <button className="agent-fab" aria-label="Open Agent" onClick={() => setAgentOpen(true)}><Message size={23} /></button>}
-    {agentOpen && !modal && !quote && <AgentPanel key={project.id} project={project} orders={projectOrders} busy={busy} error={error} onSend={sendMessage} onAction={action => void agentAction(action)} onClose={() => setAgentOpen(false)} />}
+    {agentOpen && !modal && !quote && <AgentPanel key={project.id} project={project} orders={projectOrders} busy={busy} error={error} onSend={sendMessage} onClear={clearChat} onAction={action => void agentAction(action)} onClose={() => setAgentOpen(false)} />}
     {modal === 'edit' && <Modal title="Edit brief" onClose={() => setModal(null)}><BriefEditor brief={project.brief} onChange={updateBrief} onReview={saveBrief} busy={busy} />{error && <p className="notice mt-4" role="alert">{error}</p>}</Modal>}
     {modal === 'direction' && project.plan && <Modal title="Creative direction" onClose={() => setModal(null)}><DirectionEditor plan={project.plan} stale={stale} onChange={updatePlan} onConfirm={confirmCopy} />{error && <p className="notice mt-4" role="alert">{error}</p>}</Modal>}
     {modal === 'export' && <Modal title="Export campaign" onClose={() => setModal(null)}><div className="export-options">

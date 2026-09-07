@@ -433,3 +433,11 @@ button:disabled { color: var(--text-faint); opacity: 1; }
 .agent-panel::backdrop { background: transparent; backdrop-filter: none; }
 .agent-panel { box-shadow: 0 12px 48px color-mix(in srgb, var(--bg-base) 70%, transparent); }
 
+
+.agent-identity { display: inline-flex; align-items: center; gap: 11px; }
+.agent-identity>svg { color: var(--text-secondary); flex-shrink: 0; }
+
+.wallet-control { position: relative; display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.wallet-address-label { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.wallet-copy { width: 28px; height: 28px; color: var(--text-muted); }
+.wallet-copy-feedback:not(:empty) { position: absolute; right: 0; top: calc(100% + 9px); z-index: 40; width: max-content; max-width: 230px; padding: 7px 10px; background: var(--bg-inset); border: 1px solid var(--border-subtle); border-radius: 4px; color: var(--text-secondary); font-size: 11px; }

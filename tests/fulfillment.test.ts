@@ -62,3 +62,35 @@ test('a successful charge with failed asset delivery remains visible and needs r
   }))
   assert.equal(current.status, 'uncertain'); assert.equal(current.settled, true); assert.equal(current.recoverable, true)
 })
+
+function bodyPayment(amount = '50000000000000000') {
+  const transaction = '0x' + 'c'.repeat(64)
+  return { facilitator: 'b402', network: 'eip155:56', transaction,
+    raw: { code: '000000', success: true, data: { success: true, network: 'eip155:56', transaction, amount } } }
+}
+test('recognizes actual Xona body receipts without a payment response header', async () => {
+  const current = order()
+  await fulfill(quote, current, deps({ request: async () => new Response(JSON.stringify({ image_url: 'https://example.com/image.png', payment: bodyPayment() })) }))
+  assert.equal(current.status, 'delivered'); assert.equal(current.settled, true)
+  assert.equal(current.settlement, '0x' + 'c'.repeat(64))
+})
+test('does not attribute mismatched amount, network or failed body receipts to an order', async () => {
+  const valid = bodyPayment()
+  for (const payment of [bodyPayment('1'), { ...valid, network: 'eip155:1' }, { ...valid, raw: { ...valid.raw, success: false } }, { ...valid, transaction: '0x' + 'd'.repeat(64) }]) {
+    const current = order()
+    await fulfill(quote, current, deps({ request: async () => new Response(JSON.stringify({ payment })) }))
+    assert.equal(current.settled, false)
+  }
+})
+test('preserves failed provider JSON and payment evidence without enabling a recovery or retry charge', async () => {
+  const current = order(); let saved: unknown; let calls = 0
+  const body = { error: 'Upstream generation failed', payment: bodyPayment() }
+  await fulfill(quote, current, deps({
+    request: async () => { calls++; return new Response(JSON.stringify(body), { status: 500 }) },
+    saveResponse: async raw => { saved = raw },
+    saveAsset: async () => { throw new Error('Must not download failed delivery') },
+  }))
+  assert.equal(calls, 1); assert.deepEqual(saved, body)
+  assert.equal(current.status, 'uncertain'); assert.equal(current.settled, true)
+  assert.equal(current.recoverable, undefined); assert.match(current.error!, /Payment settled, but delivery failed/)
+})

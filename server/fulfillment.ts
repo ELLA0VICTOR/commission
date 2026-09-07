@@ -1,3 +1,4 @@
+import { recordBodySettlement } from './settlement.ts'
 import type { Order, Plan, Service } from '../shared/domain.ts'
 export type FulfillmentQuote = { service: Service; paymentId: string; index: number; body: unknown }
 type Signature = { paymentHeaderName: string; paymentHeaderValue: string; approveTxHash?: string; signatureExpiresAt: number }
@@ -25,9 +26,14 @@ export async function fulfill(quote: FulfillmentQuote, order: Order, deps: Fulfi
       } catch { /* Never invent a receipt when delivery succeeds without settlement metadata. */ }
       await deps.persist()
     }
-    if (!response.ok) throw new Error('Provider returned HTTP ' + response.status + ' after authorization. Payment may have settled; do not repeat it blindly.')
-    const raw: unknown = await response.json()
-    await deps.saveResponse(raw, order.id)
+    const raw: unknown = await response.json().catch(() => undefined)
+    if (raw !== undefined) {
+      await deps.saveResponse(raw, order.id)
+      recordBodySettlement(raw, order)
+      await deps.persist()
+    }
+    if (!response.ok) throw new Error('Provider returned HTTP ' + response.status + ' after authorization. ' + (order.settled ? 'Payment settled, but delivery failed.' : 'Payment may have settled; do not repeat it blindly.'))
+    if (raw === undefined) throw new Error('Provider returned an unreadable response after authorization. Check settlement before retrying.')
     order.recoverable = true
     await deps.persist()
     if (quote.service === 'plan') order.plan = deps.parsePlan(raw)
