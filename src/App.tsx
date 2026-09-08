@@ -4,6 +4,7 @@ import { ArrowDownToLine, ArrowUpRight, ChevronRight, CircleHelp, Menu, Message,
 import { briefSchema, planSchema, serviceNames, type Brief, type Order, type Plan, type Project, type Quote, type Service, type Wallet, type UploadedNarration } from '../shared/domain'
 import { Sidebar } from './components/layout/Sidebar'
 import { BriefEditor } from './components/campaign/BriefEditor'
+import { InvitationPanel } from './components/campaign/InvitationPanel'
 import { Poster, type Format } from './components/campaign/Poster'
 import { Preview } from './components/campaign/Preview'
 import { ProgressStrip } from './components/campaign/ProgressStrip'
@@ -25,7 +26,7 @@ export default function App() {
   const [wallet, setWallet] = useState<Wallet>({ connected: false })
   const [orders, setOrders] = useState<Order[]>([])
   const [format, setFormat] = useState<Format>('poster')
-  const [modal, setModal] = useState<'wallet' | 'guide' | 'preview' | 'receipts' | 'edit' | 'direction' | 'export' | 'narration' | null>(null)
+  const [modal, setModal] = useState<'wallet' | 'guide' | 'preview' | 'receipts' | 'edit' | 'direction' | 'export' | 'narration' | 'invitation' | null>(null)
   const [quote, setQuote] = useState<Quote>()
   const [busy, setBusy] = useState(false)
   const [agentThinking, setAgentThinking] = useState(false)
@@ -232,18 +233,20 @@ export default function App() {
         {notice && <div className="notice page-alert" role="status"><span>{notice}</span><button className="icon-button small" aria-label="Dismiss notification" onClick={() => setNotice('')}><X size={16} /></button></div>}
         <div className="hero-zone"><Preview brief={project.brief} artwork={artwork} format={format} onFormat={setFormat} onExpand={() => setModal('preview')} /></div>
         <ProgressStrip current={currentStage} onStep={openStep} />
-        <footer className="campaign-footer"><span>On-chain settlement <strong className={settledUnits > 0n ? 'money' : ''}>{settledAmount} U</strong></span><div><button className="text-button" onClick={() => setModal('receipts')}>Receipts</button><button className="text-button" disabled={Boolean(exporting)} onClick={() => setModal('export')}>Export</button></div></footer>
+        <footer className="campaign-footer"><span>On-chain settlement <strong className={settledUnits > 0n ? 'money' : ''}>{settledAmount} U</strong></span><div><button className="text-button" onClick={() => setModal('invitation')}>Invite guests</button><button className="text-button" onClick={() => setModal('receipts')}>Receipts</button><button className="text-button" disabled={Boolean(exporting)} onClick={() => setModal('export')}>Export</button></div></footer>
       </main>
     </div>
     {!agentOpen && !modal && !quote && <button className="agent-fab" aria-label="Open Agent" onClick={() => setAgentOpen(true)}><Message size={23} /></button>}
     {agentOpen && !modal && !quote && <AgentPanel key={project.id} project={project} orders={projectOrders} busy={busy || agentThinking} configured={agentConfigured} error={error} onSend={text => void sendMessage(text)} onClear={clearChat} onAction={action => void agentAction(action)} onClose={() => setAgentOpen(false)} />}
     {modal === 'edit' && <Modal title="Edit brief" onClose={() => setModal(null)}><BriefEditor brief={project.brief} onChange={updateBrief} onReview={saveBrief} busy={busy} />{error && <p className="notice mt-4" role="alert">{error}</p>}</Modal>}
+    {modal === 'invitation' && <Modal title="Invite guests" onClose={() => setModal(null)}><InvitationPanel brief={project.brief} onChange={updateBrief} /></Modal>}
     {modal === 'direction' && project.plan && <Modal title="Creative direction" onClose={() => setModal(null)}><DirectionEditor plan={project.plan} stale={stale} onChange={updatePlan} onConfirm={confirmCopy} />{error && <p className="notice mt-4" role="alert">{error}</p>}</Modal>}
     {modal === 'narration' && <Modal title="Campaign narration" onClose={() => setModal(null)}><NarrationPanel key={project.id} script={project.plan?.narration || ''} uploaded={uploaded} paidAudio={paidAudio} stale={stale} providerUnavailable={providerUnavailable} onSave={saveNarration} onRemove={removeNarration} onReview={() => project.plan ? setModal('direction') : setModal('edit')} onPurchase={() => { setModal(null); setAgentOpen(true); void purchase('voice') }} /></Modal>}
     {modal === 'export' && <Modal title="Export campaign" onClose={() => setModal(null)}><div className="export-options">
       <p className="text-muted">{artwork ? 'Your campaign files, with purchased artwork.' : 'Layout previews. Original artwork has not been purchased.'}</p>
       <p className="footnote">{audioSource ? 'Narration source: ' + audioSource : 'Voiceover is optional. Your animated promo exports without audio unless you add narration.'}</p>
       <button className="text-button" onClick={() => setModal('narration')}>Optional voiceover</button>
+      <button className="text-button" onClick={() => setModal('invitation')}>Invitation, QR & calendar</button>
       <button className="button primary" disabled={Boolean(exporting)} onClick={() => void exportAsset('zip')}>{exporting === 'zip' ? 'Packing…' : 'Download campaign ZIP'}<ArrowDownToLine size={16} /></button>
       <button className="text-button" disabled={Boolean(exporting)} onClick={() => void exportAsset('png')}>Export {format} PNG</button>
       <button className="text-button" disabled={Boolean(exporting)} onClick={() => void exportAsset('video')}>{exporting === 'video' ? 'Rendering ' + progress + '%' : audio ? 'Export narrated promo · WebM' : artwork ? 'Export animated promo · WebM' : 'Export silent preview · WebM'}</button>

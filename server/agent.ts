@@ -10,10 +10,10 @@ const schemas = {
   open_panel: z.object({ panel: z.enum(agentPanels) }).strict(),
 }
 const descriptions: Record<keyof typeof schemas, string> = {
-  update_brief: 'Save only changed event details. Preserve other fields. Dates must be YYYY-MM-DD; ask about ambiguity. Do not invent venue, time or budget. Map atmosphere to the direction enum and retain specific colors/style in details.',
+  update_brief: 'Save only changed event details. Preserve other fields. Dates must be YYYY-MM-DD; ask about ambiguity. Do not invent venue, time or budget. Map atmosphere to the direction enum and retain specific colors/style in details. rsvpUrl must be a user-supplied http/https RSVP or ticket link. For exact calendarStart/calendarEnd UTC instants, ask for the timezone first; open invitation for manual setup if ambiguous. Invitations are shared manually; no sending or reminder tools exist.',
   update_copy: 'Revise selected parts of existing purchased creative direction or caption. Requires an existing plan. The user must review changes before artwork production/export.',
   request_quote: 'Get a real unsigned Binance Agentic Wallet B402 quote for creative direction (plan) or artwork (image). Does NOT pay. Requires a complete brief; artwork also requires reviewed direction. Call when the user asks to proceed/get a price. Never retry failed orders.',
-  open_panel: 'Open edit brief, direction/copy review, export, receipts, wallet, or optional narration. Does not approve copy, export files, or make payments.',
+  open_panel: 'Open edit brief, direction/copy review, export, receipts, wallet, optional narration, or invitation (RSVP link, QR, calendar file and copyable invite). No automatic sending, reminders or calendar-account access. Does not approve copy, export files, or make payments.',
 }
 export const agentTools: ModelItem[] = Object.entries(schemas).map(([name, schema]) => ({ type: 'function', name, description: descriptions[name as keyof typeof schemas], strict: false, parameters: z.toJSONSchema(schema) }))
 const callSchema = z.object({ type: z.literal('function_call'), name: z.string(), arguments: z.string().max(16000), call_id: z.string() })
@@ -21,7 +21,7 @@ export type AgentDependencies = {
   complete?: (request: ModelRequest) => Promise<ModelItem[]>;
   quote: (service: 'plan' | 'image', brief: Brief, plan?: Plan) => Promise<Quote>;
 }
-function briefKey(brief: Brief) { return JSON.stringify({ ...brief, budget: undefined }) }
+function briefKey(brief: Brief) { return JSON.stringify({ ...brief, budget: undefined, rsvpUrl: undefined, calendarStart: undefined, calendarEnd: undefined }) }
 function validDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
   const date = new Date(value + 'T12:00:00Z')

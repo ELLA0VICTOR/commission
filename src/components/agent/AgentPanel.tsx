@@ -3,7 +3,7 @@ import { serviceNames, type Order, type Project } from '../../../shared/domain'
 import type { AgentAction } from '../../lib/conversation'
 import { Modal } from '../ui/Modal'
 import { AgentMark, ArrowUpRight, LoaderCircle, ReceiptText, Send } from '../ui/Icons'
-const actions: [AgentAction, string][] = [['brief', 'Build my brief'], ['direction', 'Direction'], ['image', 'Artwork'], ['voice', 'Voiceover'], ['upload', 'Upload audio'], ['review', 'Review copy'], ['wallet', 'Wallet'], ['export', 'Export']]
+const actions: [AgentAction, string][] = [['brief', 'Build my brief'], ['direction', 'Direction'], ['image', 'Artwork'], ['voice', 'Voiceover'], ['upload', 'Upload audio'], ['review', 'Review copy'], ['invitation', 'Invite guests'], ['wallet', 'Wallet'], ['export', 'Export']]
 export function AgentPanel({ project, orders, busy, configured, error, onSend, onAction, onClose, onClear }: {
   project: Project; orders: Order[]; busy: boolean; configured?: boolean; error: string; onSend: (text: string) => void;
   onAction: (action: AgentAction) => void; onClose: () => void; onClear: () => void;

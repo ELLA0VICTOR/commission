@@ -28,7 +28,7 @@ export function loadProjects(): Project[] {
   return initial
 }
 export function saveProjects(projects: Project[]) { localStorage.setItem(key, JSON.stringify(projects)) }
-export function contentKey(brief: Project['brief']) { return JSON.stringify({ ...brief, budget: undefined }) }
+export function contentKey(brief: Project['brief']) { return JSON.stringify({ ...brief, budget: undefined, rsvpUrl: undefined, calendarStart: undefined, calendarEnd: undefined }) }
 export function dateLabel(date: string) {
   const parsed = new Date(date + 'T12:00:00')
   return Number.isNaN(parsed.getTime()) ? 'Choose a date' : parsed.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })

@@ -6,6 +6,8 @@ export const draftBriefSchema = z.object({
   time: z.string().max(30), venue: z.string().max(90), callToAction: z.string().max(60),
   details: z.string().max(600), direction: z.enum(['After dark', 'Open air', 'Gallery opening']),
   budget: z.string().max(20),
+  rsvpUrl: z.string().max(500).optional(),
+  calendarStart: z.string().max(30).optional(), calendarEnd: z.string().max(30).optional(),
 })
 export const agentRequestSchema = z.object({
   projectId: z.string().uuid(), brief: draftBriefSchema, plan: planSchema.optional(),
@@ -14,7 +16,7 @@ export const agentRequestSchema = z.object({
   timeZone: z.string().max(80),
 })
 export type AgentRequest = z.infer<typeof agentRequestSchema>
-export const agentPanels = ['edit', 'direction', 'export', 'receipts', 'wallet', 'narration'] as const
+export const agentPanels = ['edit', 'direction', 'export', 'receipts', 'wallet', 'narration', 'invitation'] as const
 export type AgentTurn = {
   reply: string; brief: Brief; plan?: Plan; quote?: Quote; panel?: typeof agentPanels[number];
   changes: string[];

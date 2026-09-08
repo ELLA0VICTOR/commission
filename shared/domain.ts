@@ -1,5 +1,13 @@
 import { z } from 'zod'
 
+export const rsvpUrlSchema = z.union([z.literal(''), z.string().trim().max(500).url().refine(value => {
+  try {
+    const url = new URL(value)
+    return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password
+  } catch { return false }
+}, 'Use an http or https invitation link')])
+export const calendarInstantSchema = z.union([z.literal(''), z.iso.datetime()])
+
 export const briefSchema = z.object({
   title: z.string().trim().min(2).max(64),
   subtitle: z.string().trim().max(100),
@@ -8,6 +16,9 @@ export const briefSchema = z.object({
   venue: z.string().trim().min(2).max(90),
   callToAction: z.string().trim().min(2).max(60),
   details: z.string().trim().max(600),
+  rsvpUrl: rsvpUrlSchema.optional(),
+  calendarStart: calendarInstantSchema.optional(),
+  calendarEnd: calendarInstantSchema.optional(),
   direction: z.enum(['After dark', 'Open air', 'Gallery opening']),
   budget: z.string().regex(/^\d{1,2}(\.\d{1,4})?$/).refine(v => Number(v) > 0 && Number(v) <= 10, 'Set a budget between 0.0001 and 10 U'),
 })

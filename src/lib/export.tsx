@@ -4,6 +4,7 @@ import fontUrl from '@fontsource-variable/hanken-grotesk/files/hanken-grotesk-la
 import type { Brief, Order, Plan } from '../../shared/domain'
 import { Poster, type Format } from '../components/campaign/Poster'
 import { dateLabel } from './projects'
+import { calendarFile, invitationText } from './invitation'
 
 function dataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -60,6 +61,8 @@ export async function campaignZip(brief: Brief, orders: Order[], plan?: Plan, ar
     'poster.png': new Uint8Array(await poster.arrayBuffer()),
     'story.png': new Uint8Array(await story.arrayBuffer()),
     'caption.txt': strToU8(plan?.caption || fallbackCaption(brief)),
+    'invitation.txt': strToU8(invitationText(brief)),
+    'event.ics': strToU8(calendarFile(brief)),
     'campaign.json': strToU8(JSON.stringify({ brief, plan, artwork: artwork ? 'Purchased' : 'Local layout preview', narration: audio ? { source: audioSource || 'B402 purchase' } : null, receipts: orders }, null, 2)),
     'READ-ME.txt': strToU8('Created with Commission. ' + (artwork ? 'Includes purchased artwork.' : 'LAYOUT PREVIEW: artwork has not been purchased or generated.') + (audio ? '\nNarration source: ' + (audioSource || 'B402 purchase') + '.' : '\nNo narration included.') + '\nReview event details and provider terms before publishing.\nMotion promo is exported separately as WebM in the workspace.'),
   }

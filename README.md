@@ -189,13 +189,16 @@ Ambiguous failures do not cause automatic repayment. **Retry saved delivery** re
 | --- | --- | --- |
 | Poster | PNG, `900 × 1200` | Artwork and event typography, 3:4. |
 | Story | PNG, `900 × 1600` | Vertical 9:16 composition. |
-| Campaign package | ZIP | Images, caption, metadata, receipts, and selected audio. |
+| Campaign package | ZIP | Images, caption, invitation text, calendar file, metadata, receipts, and selected audio. |
+| Calendar invitation | ICS | Date-only or explicitly timed event, with venue and RSVP link. |
 | Animated promo | WebM, `900 × 1600` | Moving artwork with stationary typography and optional narration. |
 
 ```text
 poster.png
 story.png
 caption.txt
+invitation.txt
+event.ics
 campaign.json
 READ-ME.txt
 narration-script.txt         # When a plan includes a script
@@ -206,6 +209,14 @@ voiceover-uploaded.wav      # Uploaded audio; .mp3 or .wav
 Only selected narration is included. `campaign.json` contains the brief, plan, artwork provenance, narration source, and receipts. WebM is exported separately.
 
 Keep the tab open during rendering. Video uses VP9/Opus or VP8/Opus when supported, with a WebM fallback. Without narration, the promo is silent. Exports without purchased artwork use an explicitly labelled local layout preview.
+
+### Guest invitations
+
+Open **Invite guests** in the workspace or agent actions. Add an existing RSVP form or ticket URL to embed a locally generated QR code on the poster, story, and animated promo. The link is also included in the invitation text and calendar file. Commission does not host an RSVP page or collect responses.
+
+Copy the invitation message and share it with the exported artwork. Download `event.ics` separately or from the campaign ZIP, then open or import it in your calendar. Entries are date-only unless both start and end are supplied. The editor uses the browser’s local timezone; timed entries are exported in UTC. The calendar start must match the brief’s event date.
+
+Invitations are shared manually. No contacts are accessed, messages sent, calendar accounts connected, reminders scheduled, or planning fees charged. QR generation and calendar export run locally without API credits.
 
 ### Optional narration
 
