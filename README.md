@@ -270,34 +270,41 @@ Browser tests use Microsoft Edge and a Windows launch command in [playwright.con
 ### Repository structure
 
 ```text
-public/                     Branding assets
-src/
-  components/
-    agent/                  Conversation and production controls
-    campaign/               Brief, direction, preview, progress, narration
-    layout/                 Navigation and workspace shell
-    ui/                     Shared dialogs and SVG glyphs
-    wallet/                 Pairing and purchase approval
-  lib/                      API client, persistence, exports
-  App.tsx                   Campaign state and interactions
-  index.css                 Component and layout styles
-  tokens.css                Theme tokens
-shared/
-  domain.ts                 Campaign, wallet, order, and quote types
-  agent.ts                  Conversation schemas
-server/
-  agent.ts                  Validated conversational tools
-  agent-model.ts            OpenAI transport and configuration
-  wallet.ts                 Agentic Wallet CLI adapter
-  policy.ts                 Payment constraints and requests
-  provider.ts               Provider transport and media handling
-  fulfillment.ts            Signed-request delivery flow
-  settlement.ts             Settlement-evidence validation
-  store.ts                  Orders and saved responses
-  audio-upload.ts           Narration validation and storage
-  index.ts                  Local HTTP API
-scripts/                    Provider diagnostics
-tests/                      Unit and browser tests
+commission/
+├── public/                     Branding assets
+├── src/
+│   ├── components/
+│   │   ├── agent/              Conversation and production controls
+│   │   ├── campaign/           Brief, direction, preview, progress, narration
+│   │   ├── layout/             Navigation and workspace shell
+│   │   ├── ui/                 Shared dialogs and SVG glyphs
+│   │   └── wallet/             Pairing and purchase approval
+│   ├── lib/                    API client, persistence, exports
+│   ├── App.tsx                 Campaign state and interactions
+│   ├── index.css               Component and layout styles
+│   └── tokens.css              Theme tokens
+├── shared/
+│   ├── domain.ts               Campaign, wallet, order, and quote types
+│   └── agent.ts                Conversation schemas
+├── server/
+│   ├── agent.ts                Validated conversational tools
+│   ├── agent-model.ts          OpenAI transport and configuration
+│   ├── wallet.ts               Agentic Wallet CLI adapter
+│   ├── policy.ts               Payment constraints and requests
+│   ├── provider.ts             Provider transport and media handling
+│   ├── fulfillment.ts          Signed-request delivery flow
+│   ├── settlement.ts           Settlement-evidence validation
+│   ├── store.ts                Orders and saved responses
+│   ├── audio-upload.ts         Narration validation and storage
+│   └── index.ts                Local HTTP API
+├── scripts/                    Provider diagnostics
+├── tests/                      Unit and browser tests
+├── .env.example                Environment configuration template
+├── package.json                Dependencies and commands
+├── vite.config.ts              Frontend development configuration
+├── playwright.config.ts        Browser test configuration
+├── LICENSE                     MIT license
+└── README.md                   Project documentation
 ```
 
 ## Troubleshooting
