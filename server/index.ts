@@ -1,187 +1,90 @@
-import { agentRequestSchema } from '../shared/agent.ts'
-import { runAgent } from './agent.ts'
-import { agentStatus } from './agent-model.ts'
-import { saveUploadedAudio } from './audio-upload.ts'
+import './agent-model.ts'
 import express from 'express'
-import { fulfill } from './fulfillment.ts'
-import { randomUUID, randomBytes } from 'node:crypto'
+import { createHmac } from 'node:crypto'
 import { resolve } from 'node:path'
 import { z } from 'zod'
-import { briefSchema, planSchema, type Order, type Quote, type Brief } from '../shared/domain.ts'
-import { assertBudget, assertPurchaseState, decimal, endpoints, fingerprint, MERCHANT, requestBody, samePaymentAccept, units, U_TOKEN, validateAccept } from './policy.ts'
-import { baw } from './wallet.ts'
-import { assetDir, initStore, orders, persist, saveResponse, readResponse } from './store.ts'
-import { getRequirements, merchantRequest, parsePlan, saveAsset } from './provider.ts'
+import { createAccounts } from './accounts.ts'
+import { createUsageLimit } from './usage.ts'
+import { initStore, withStore, type StudioStore } from './store.ts'
+import { createStudioRouter } from './studio.ts'
 
-await initStore()
+const hosted = process.env.COMMISSION_PUBLIC === '1'
+const port = Number(process.env.PORT || 4317)
+const root = resolve(process.env.COMMISSION_DATA_DIR || '.commission-data')
+const publicOrigin = process.env.COMMISSION_PUBLIC_ORIGIN || process.env.RENDER_EXTERNAL_URL || ''
+const secret = process.env.COMMISSION_SESSION_SECRET || ''
+if (hosted && (!publicOrigin || secret.length < 32)) throw new Error('Public mode requires COMMISSION_PUBLIC_ORIGIN and a stable COMMISSION_SESSION_SECRET of at least 32 characters.')
+if (hosted && new URL(publicOrigin).protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(new URL(publicOrigin).hostname)) throw new Error('Public hosting requires HTTPS.')
+// The CLI's OS keyring uses a global service/account name. Public hosting must
+// use the official per-directory encrypted-file fallback, never a shared keyring.
+if (hosted && process.env.COMMISSION_WALLET_ENABLED !== '0') {
+  const keyringAvailable = await import('@github/keytar').then(async module => {
+    await module.default.getPassword('baw', 'agentSessionId'); return true
+  }).catch(() => false)
+  if (keyringAvailable) throw new Error('Public wallet hosting requires a headless environment without a shared OS keyring. Use the supplied Docker image.')
+}
 const app = express()
-const sessionToken = randomBytes(32).toString('hex')
-const port = 4317
-const allowedHosts = new Set(['127.0.0.1:4317', 'localhost:4317', '127.0.0.1:5173', 'localhost:5173'])
+if (hosted) app.set('trust proxy', 1)
+const localOrigins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`, 'http://127.0.0.1:5173', 'http://localhost:5173']
+const origins = new Set(hosted ? [new URL(publicOrigin).origin] : localOrigins)
+const allowedHosts = new Set([...origins].map(origin => new URL(origin).host))
 app.use((req, res, next) => {
-  if (!allowedHosts.has(req.headers.host || '')) { res.status(403).json({ error: 'Local access only.' }); return }
-  const origin = req.headers.origin
-  if (origin && !['http://127.0.0.1:5173', 'http://localhost:5173', 'http://127.0.0.1:4317', 'http://localhost:4317'].includes(origin)) {
-    res.status(403).json({ error: 'Origin not allowed.' }); return
-  }
   res.setHeader('X-Content-Type-Options', 'nosniff')
   res.setHeader('Content-Security-Policy', "frame-ancestors 'none'")
   res.setHeader('Referrer-Policy', 'no-referrer')
   if (req.path.startsWith('/api')) res.setHeader('Cache-Control', 'no-store')
-  if (!['GET', 'HEAD'].includes(req.method) && req.headers['x-commission-session'] !== sessionToken) {
-    res.status(403).json({ error: 'Reload Commission to renew your local session.' }); return
+  if (req.path === '/api/health' && req.method === 'GET') { res.json({ ok: true, mode: hosted ? 'hosted' : 'local' }); return }
+  if (!allowedHosts.has(req.headers.host || '')) { res.status(403).json({ error: 'Host not allowed.' }); return }
+  const origin = req.headers.origin
+  if ((origin && !origins.has(origin)) || (hosted && !['GET', 'HEAD'].includes(req.method) && !origin)) {
+    res.status(403).json({ error: 'Origin not allowed.' }); return
   }
   next()
 })
 app.use(express.json({ limit: '64kb' }))
-app.use('/api/assets', express.static(assetDir, { dotfiles: 'deny' }))
-app.get('/api/session', (_req, res) => res.json({ token: sessionToken }))
-app.get('/api/health', (_req, res) => res.json({ ok: true, mode: 'local', wallet: 'Binance Agentic Wallet', payments: 'B402 / BNB Chain' }))
-app.get('/api/orders', (_req, res) => res.json(orders))
-// Uploads are local assets, never purchase records, and require the same local session.
-app.post('/api/narration/upload', express.raw({ type: ['audio/mpeg', 'audio/wav'], limit: '10mb' }), async (req, res) => {
-  if (!Buffer.isBuffer(req.body)) throw new Error('Choose an MP3 or WAV recording.')
-  res.json(await saveUploadedAudio(req.body, req.headers['content-type']?.split(';')[0] || ''))
-})
-
-app.get('/api/wallet', async (_req, res) => {
-  const status = await baw<{ status: string }>(['wallet', 'status'])
-  if (status.status !== 'CONNECTED') { res.json({ connected: false }); return }
-  const data = await baw<{ addresses: { binanceChainId: string; address: string }[] }>(['wallet', 'address'])
-  res.json({ connected: true, address: data.addresses.find(item => item.binanceChainId === '56')?.address })
-})
-type Pairing = { status: 'waiting' | 'connected' | 'failed'; urlForWeb?: string; pairingCode?: string; expireAt?: number | string; error?: string }
-let pairing: Pairing | undefined
-let startingPairing: Promise<Pairing> | undefined
-app.get('/api/wallet/pairing', (_req, res) => res.json(pairing || { status: 'idle' }))
-async function beginPairing(): Promise<Pairing> {
-  const result = await baw<{ status?: string; urlForWeb: string; pairingCode: string; qrCodeId: string; expireAt: number | string }>(['auth', 'signin'])
-  if (result.status === 'ALREADY_CONNECTED') return { status: 'connected' }
-  const url = new URL(result.urlForWeb)
-  if (url.protocol !== 'https:' || !(url.hostname === 'binance.com' || url.hostname.endsWith('.binance.com')))
-    throw new Error('Binance returned an unexpected pairing URL. Connect with the official wallet CLI instead.')
-  const current: Pairing = { status: 'waiting', urlForWeb: result.urlForWeb, pairingCode: result.pairingCode, expireAt: result.expireAt }
-  pairing = current
-  void baw<{ status: string }>(['auth', 'verify', '--qrCodeId', result.qrCodeId], 330_000)
-    .then(async result => {
-      const status = result.status === 'SUCCESS' ? await baw<{ status: string }>(['wallet', 'status']) : undefined
-      current.status = status?.status === 'CONNECTED' ? 'connected' : 'failed'
-      if (current.status === 'failed') current.error = 'The local wallet has not confirmed this connection. Start a new pairing.'
-    })
-    .catch(() => { current.status = 'failed'; current.error = 'Pairing expired or was declined. Start a new connection.' })
-  return current
-}
-app.post('/api/wallet/connect', async (_req, res) => {
-  if (pairing?.status === 'waiting') { res.json(pairing); return }
-  startingPairing ??= beginPairing().finally(() => { startingPairing = undefined })
-  res.json(await startingPairing)
-})
-app.post('/api/wallet/disconnect', async (_req, res) => {
-  if (orders.some(order => order.status === 'processing')) throw new Error('Wait for the current purchase to finish before disconnecting.')
-  await baw(['auth', 'signout'])
-  pairing = undefined
-  res.json({ ok: true })
-})
-
-const purchaseSchema = z.object({
-  projectId: z.string().uuid(), service: z.enum(['plan', 'image', 'voice']),
-  brief: briefSchema, plan: planSchema.optional(), retryOf: z.string().uuid().optional(),
-})
-type InternalQuote = Quote & { paymentId: string; index: number; body: unknown; inputKey: string; budget: string; brief: Brief; retryOf?: string }
-const quotes = new Map<string, InternalQuote>()
-type WalletOption = {
-  index: number; status: string; reasons?: string[]; tokenAddress: string; payTo: string;
-  amount: string; tokenSymbol: string; binanceChainId: string; scheme: string;
-  assetTransferMethod: string; needApproveFirst: boolean; originalAccept: Record<string, unknown>;
-}
-function publicQuote(quote: InternalQuote): Quote {
-  const { id, projectId, service, amount, token, tokenAddress, payTo, expiresAt, ready, reasons } = quote
-  return { id, projectId, service, amount, token, tokenAddress, payTo, expiresAt, ready, reasons }
-}
-async function prepareQuote(input: z.infer<typeof purchaseSchema>) {
-  assertPurchaseState(orders, input.projectId, input.service, input.retryOf)
-  const body = requestBody(input.service, input.brief, input.plan)
-  const inputKey = fingerprint(body)
-  if (orders.some(order => order.projectId === input.projectId && order.service === input.service && order.inputKey === inputKey && order.status === 'delivered'))
-    throw new Error('This exact service has already been delivered. Reuse it from the campaign receipts.')
-  const requirements = await getRequirements(await merchantRequest(endpoints[input.service], body))
-  const accepts = requirements.accepts as Record<string, unknown>[]
-  const eligible = accepts.filter(validateAccept)
-  if (!eligible.length) throw new Error('No supported exact U payment on BNB Chain. No signature was requested.')
-  // Pass the whole, unchanged challenge; never repair or manufacture a provider quote.
-  const preview = await baw<{ paymentId: string; options: WalletOption[] }>([
-    'x402-payment', 'preview', '--paymentRequirements', Buffer.from(JSON.stringify(requirements)).toString('base64'),
-  ])
-  const option = preview.options.find(item =>
-    validateAccept(item.originalAccept) && item.tokenAddress?.toLowerCase() === U_TOKEN.toLowerCase() &&
-    item.payTo?.toLowerCase() === MERCHANT.toLowerCase() && item.binanceChainId === '56' &&
-    item.scheme === 'exact' && item.assetTransferMethod === 'eip3009' && item.needApproveFirst === false &&
-    eligible.some(accept => samePaymentAccept(accept, item.originalAccept)) &&
-    units(item.amount) === BigInt(item.originalAccept.amount as string),
-  )
-  if (!option) throw new Error('The wallet could not validate a supported payment option. No payment was signed.')
-  assertBudget(input.brief.budget, orders.filter(order => order.projectId === input.projectId).map(order => order.amount), option.amount)
-  for (const [id, quote] of quotes) if (quote.expiresAt < Date.now()) quotes.delete(id)
-  const quote: InternalQuote = {
-    id: randomUUID(), projectId: input.projectId, service: input.service, amount: decimal(units(option.amount)),
-    token: 'U', tokenAddress: U_TOKEN, payTo: option.payTo, expiresAt: Date.now() + 120_000,
-    ready: option.status === 'READY_TO_SIGN', reasons: option.reasons || [],
-    paymentId: preview.paymentId, index: option.index, body, inputKey, budget: input.brief.budget, brief: input.brief, retryOf: input.retryOf,
+const accounts = hosted ? await createAccounts(root, new URL(publicOrigin).protocol === 'https:') : undefined
+const consumeAI = hosted ? await createUsageLimit(root) : undefined
+const writeLimits = new Map<string, { count: number; expires: number }>()
+const studios = new Map<string, Promise<{ store: StudioStore; router: express.Router }>>()
+function studio(id: string) {
+  let pending = studios.get(id)
+  if (!pending) {
+    const directory = hosted ? resolve(root, 'users', id) : root
+    const walletEnv = hosted ? {
+      BINANCE_BAW_DIR: resolve(directory, 'wallet'),
+      BINANCE_INSTANCE_ID: createHmac('sha256', secret).update(id).digest('hex'),
+    } : undefined
+    pending = initStore(directory, walletEnv).then(store => ({ store, router: withStore(store, createStudioRouter) }))
+    studios.set(id, pending)
+    void pending.catch(() => studios.delete(id))
   }
-  quotes.set(quote.id, quote)
-  return publicQuote(quote)
+  return pending
 }
-app.post('/api/quotes', async (req, res) => { res.json(await prepareQuote(purchaseSchema.parse(req.body))) })
-
-app.get('/api/agent/status', (_req, res) => res.json(agentStatus()))
-const agentRuns = new Set<string>()
-app.post('/api/agent/message', async (req, res) => {
-  const input = agentRequestSchema.parse(req.body)
-  if (agentRuns.has(input.projectId) || agentRuns.size >= 2) { res.status(429).json({ error: 'The agent is still working. Wait for its reply before sending another message.' }); return }
-  agentRuns.add(input.projectId)
-  try {
-    res.json(await runAgent(input, orders, { quote: (service, brief, plan) => prepareQuote({ projectId: input.projectId, service, brief, plan }) }))
-  } finally { agentRuns.delete(input.projectId) }
+if (!hosted) await studio('local')
+app.get('/api/access', (req, res) => {
+  const user = accounts?.identify(req)
+  res.json({ hosted, user: user ? { id: user.id, username: user.username } : null })
 })
-
-app.post('/api/purchases', async (req, res) => {
-  const { quoteId, approvedAmount } = z.object({ quoteId: z.string().uuid(), approvedAmount: z.string() }).parse(req.body)
-  const existing = orders.find(order => order.id === quoteId)
-  if (existing) { res.json(existing); return }
-  const quote = quotes.get(quoteId)
-  if (!quote || quote.expiresAt <= Date.now()) throw new Error('This quote expired. Request a fresh quote before approving.')
-  if (!quote.ready || quote.amount !== approvedAmount) throw new Error('This exact payment has not been approved or is not ready.')
-  assertPurchaseState(orders, quote.projectId, quote.service, quote.retryOf)
-  if (orders.some(order => order.projectId === quote.projectId && order.service === quote.service && order.inputKey === quote.inputKey))
-    throw new Error('This exact production request already has a receipt. Reuse it instead of paying again.')
-  assertBudget(quote.budget, orders.filter(order => order.projectId === quote.projectId).map(order => order.amount), quote.amount)
-  const order: Order = {
-    id: quote.id, projectId: quote.projectId, service: quote.service, inputKey: quote.inputKey,
-    status: 'processing', amount: quote.amount, token: quote.token, createdAt: new Date().toISOString(), settled: false,
-    retryOf: quote.retryOf, briefSnapshot: quote.brief, sourceText: quote.service === 'voice' ? (quote.body as { text: string }).text : undefined,
+if (accounts) {
+  app.post('/api/auth/register', (req, res) => accounts.enter(req, res, true))
+  app.post('/api/auth/login', (req, res) => accounts.enter(req, res, false))
+  app.post('/api/auth/logout', (req, res) => accounts.logout(req, res))
+}
+app.use(async (req, res, next) => {
+  if (!req.path.startsWith('/api/')) { next(); return }
+  const user = accounts?.identify(req)
+  if (hosted && !user) { res.status(401).json({ error: 'Sign in to your studio to continue.' }); return }
+  if (user && req.method === 'POST') {
+    for (const [id, limit] of writeLimits) if (limit.expires < Date.now()) writeLimits.delete(id)
+    const limit = writeLimits.get(user.id) || { count: 0, expires: Date.now() + 15 * 60_000 }
+    limit.count++; writeLimits.set(user.id, limit)
+    if (limit.count > 60) { res.status(429).json({ error: 'Too many requests. Please pause and try again later.' }); return }
   }
-  // Reserve and persist before signing. Duplicate clicks and restarted servers cannot sign twice.
-  orders.push(order)
-  await persist()
-  quotes.delete(quoteId)
-  void fulfill(quote, order, {
-    sign: (paymentId, index) => baw(['x402-payment', 'sign', '--paymentId', paymentId, '--selectedIndex', String(index)]),
-    request: (service, body, signature) => merchantRequest(endpoints[service], body, signature),
-    parsePlan, saveAsset, saveResponse, persist,
-  }).catch(() => console.error('Could not persist purchase status. Check the local data directory before restarting.'))
-  res.status(202).json(order)
-})
-app.post('/api/orders/:id/recover', async (req, res) => {
-  const id = z.string().uuid().parse(req.params.id)
-  const order = orders.find(item => item.id === id)
-  if (!order || !order.recoverable || order.status !== 'uncertain') throw new Error('No saved provider response is available for this delivery.')
-  const raw = await readResponse(order.id)
-  // This route can only recover an existing response. It never calls the wallet or pays the provider.
-  if (order.service === 'plan') order.plan = parsePlan(raw)
-  else order.assetUrl = await saveAsset(raw, order.service, order.id)
-  order.status = 'delivered'; order.error = undefined
-  await persist()
-  res.json(order)
+  if (consumeAI && user && req.method === 'POST' && req.path === '/api/agent/message') {
+    try { await consumeAI(user.id) } catch (error) { res.status(429).json({ error: (error as Error).message }); return }
+  }
+  const { store, router } = await studio(user?.id || 'local')
+  withStore(store, () => router(req, res, next))
 })
 app.use(express.static(resolve('dist')))
 app.get('/{*path}', (req, res) => {
@@ -189,8 +92,10 @@ app.get('/{*path}', (req, res) => {
   res.sendFile(resolve('dist/index.html'))
 })
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (error && typeof error === 'object' && 'status' in error && error.status === 404) { res.status(404).json({ error: 'File not found in this studio.' }); return }
   const message = error instanceof z.ZodError ? 'Some fields are invalid. Check the brief and try again.' :
+    error && typeof error === 'object' && 'code' in error ? 'The service could not complete this operation. Please try later.' :
     error instanceof Error ? error.message : 'The request could not be completed.'
   res.status(400).json({ error: message })
 })
-app.listen(port, '127.0.0.1', () => console.log('Commission local service: http://127.0.0.1:' + port))
+app.listen(port, hosted ? '0.0.0.0' : '127.0.0.1', () => console.log(`Commission ${hosted ? 'hosted' : 'local'} service listening on port ${port}`))

@@ -3,8 +3,9 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { unzipSync, strFromU8 } from 'fflate'
 import { PNG } from 'pngjs'
-import jsQR from 'jsqr'
+import { createRequire } from 'node:module'
 import { defaultBrief } from '../../shared/domain.ts'
+const jsQR = createRequire(import.meta.url)('jsqr') as (data: Uint8ClampedArray, width: number, height: number) => { data: string } | null
 
 test('invitation persists, exported QR scans, and expanded poster corners fit the screen', async ({ page }) => {
   const id = randomUUID(), url = 'https://example.com/rsvp?family=commission'

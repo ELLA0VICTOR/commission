@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: commission
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/health
+    disk:
+      name: commission-data
+      mountPath: /var/data/commission
+      sizeGB: 1
+    envVars:
+      - key: COMMISSION_PUBLIC
+        value: "1"
+      - key: COMMISSION_DATA_DIR
+        value: /var/data/commission
+      - key: COMMISSION_SESSION_SECRET
+        generateValue: true
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: COMMISSION_AGENT_MODEL
+        value: gpt-4.1-mini
+      - key: COMMISSION_AI_DAILY_LIMIT
+        value: "100"
+      - key: COMMISSION_AI_USER_DAILY_LIMIT
+        value: "20"
+      - key: COMMISSION_MAX_ACCOUNTS
+        value: "100"

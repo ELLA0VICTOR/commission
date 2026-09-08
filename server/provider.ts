@@ -4,7 +4,7 @@ import { writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { z } from 'zod'
 import { planSchema, type Plan, type Service } from '../shared/domain.ts'
-import { assetDir } from './store.ts'
+import { assetDirectory } from './store.ts'
 
 export async function merchantRequest(url: string, body: unknown, signature?: string) {
   return fetch(url, {
@@ -53,6 +53,6 @@ export async function saveAsset(raw: unknown, service: Service, id: string) {
     if (length > 25 * 1024 * 1024) throw new Error('Provider asset exceeds the 25 MB limit.')
     chunks.push(chunk)
   }
-  await writeFile(resolve(assetDir, id + '.' + extension), Buffer.concat(chunks))
+  await writeFile(resolve(assetDirectory(), id + '.' + extension), Buffer.concat(chunks))
   return '/api/assets/' + id + '.' + extension
 }

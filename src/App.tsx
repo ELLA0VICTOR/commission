@@ -20,13 +20,13 @@ import { api } from './lib/api'
 import { contentKey, createProject, loadProjects, saveProjects } from './lib/projects'
 import { download, filename } from './lib/download'
 
-export default function App() {
+export default function App({ account, onSignOut }: { account?: { id: string; username: string }; onSignOut?: () => Promise<void> } = {}) {
   const [projects, setProjects] = useState(loadProjects)
   const [activeId, setActiveId] = useState(() => projects[0].id)
   const [wallet, setWallet] = useState<Wallet>({ connected: false })
   const [orders, setOrders] = useState<Order[]>([])
   const [format, setFormat] = useState<Format>('poster')
-  const [modal, setModal] = useState<'wallet' | 'guide' | 'preview' | 'receipts' | 'edit' | 'direction' | 'export' | 'narration' | 'invitation' | null>(null)
+  const [modal, setModal] = useState<'wallet' | 'guide' | 'preview' | 'receipts' | 'edit' | 'direction' | 'export' | 'narration' | 'invitation' | 'delete' | null>(null)
   const [quote, setQuote] = useState<Quote>()
   const [busy, setBusy] = useState(false)
   const [agentThinking, setAgentThinking] = useState(false)
@@ -43,6 +43,7 @@ export default function App() {
   const projectsRef = useRef(projects)
   const project = projects.find(item => item.id === activeId) || projects[0]
   const projectOrders = orders.filter(order => order.projectId === project.id)
+  const deletionBlocked = busy || agentThinking || Boolean(exporting) || projectOrders.some(order => order.status === 'processing')
   const artwork = projectOrders.filter(order => order.service === 'image' && order.status === 'delivered').at(-1)?.assetUrl
   const voiceOrder = projectOrders.filter(order => order.service === 'voice' && order.status === 'delivered').at(-1)
   const paidAudio = voiceOrder?.sourceText === project.plan?.narration ? voiceOrder?.assetUrl : undefined
@@ -184,6 +185,20 @@ export default function App() {
     const next = createProject()
     commit([...projects, next]); setActiveId(next.id); setMobileMenu(false)
   }
+  function deleteCampaign() {
+    if (deletionBlocked) return
+    const remaining = projectsRef.current.filter(item => item.id !== project.id)
+    if (!remaining.length) remaining.push(createProject())
+    commit(remaining)
+    activeProjectRef.current = remaining[0].id
+    setActiveId(remaining[0].id)
+    setModal(null); setQuote(undefined); setAgentOpen(false); setError(''); setMobileMenu(false)
+    setNotice('Campaign deleted from this browser. Wallet transactions and server payment records are retained.')
+  }
+  async function signOut() {
+    if (deletionBlocked || !onSignOut) return
+    try { await onSignOut() } catch (error) { setError((error as Error).message) }
+  }
   async function purchase(service: Service) {
     setError('')
     if (!wallet.connected) { say('Connect your Binance Agentic Wallet first. No payment is made by connecting.'); setModal('wallet'); return }
@@ -224,7 +239,7 @@ export default function App() {
   }
   return <div className={'app-shell ' + (mobileMenu ? 'menu-open' : '')}>
     {mobileMenu && <button className="sidebar-scrim" aria-label="Close navigation" onClick={() => setMobileMenu(false)} />}
-    <Sidebar projects={projects} activeId={project.id} onSelect={id => { setActiveId(id); setMobileMenu(false) }} onCreate={newProject} wallet={wallet} onWallet={() => setModal('wallet')} onGuide={() => setModal('guide')} />
+    <Sidebar projects={projects} activeId={project.id} onSelect={id => { setActiveId(id); setMobileMenu(false) }} onCreate={newProject} wallet={wallet} onWallet={() => setModal('wallet')} onGuide={() => setModal('guide')} username={account?.username} onSignOut={onSignOut ? () => void signOut() : undefined} locked={deletionBlocked} />
     <div className="main-shell">
       <header className="topbar"><div className="flex items-center gap-3 min-w-0"><button className="icon-button mobile-menu" aria-label="Open navigation" onClick={() => setMobileMenu(true)}><Menu size={20} /></button><span className="text-muted hidden sm:inline">Your studio</span><ChevronRight size={14} className="text-muted hidden sm:inline" /><span className="breadcrumb-title">{project.brief.title || 'Untitled campaign'}</span></div><div className="flex items-center gap-4"><button className="icon-button" aria-label="How Commission works" onClick={() => setModal('guide')}><CircleHelp size={18} /></button><span className="topbar-divider" /><WalletControl key={wallet.address || 'disconnected'} wallet={wallet} onOpen={() => setModal('wallet')} /></div></header>
       <main id="main-content" className="workspace">
@@ -238,7 +253,8 @@ export default function App() {
     </div>
     {!agentOpen && !modal && !quote && <button className="agent-fab" aria-label="Open Agent" onClick={() => setAgentOpen(true)}><Message size={23} /></button>}
     {agentOpen && !modal && !quote && <AgentPanel key={project.id} project={project} orders={projectOrders} busy={busy || agentThinking} configured={agentConfigured} error={error} onSend={text => void sendMessage(text)} onClear={clearChat} onAction={action => void agentAction(action)} onClose={() => setAgentOpen(false)} />}
-    {modal === 'edit' && <Modal title="Edit brief" onClose={() => setModal(null)}><BriefEditor brief={project.brief} onChange={updateBrief} onReview={saveBrief} busy={busy} />{error && <p className="notice mt-4" role="alert">{error}</p>}</Modal>}
+    {modal === 'edit' && <Modal title="Edit brief" onClose={() => setModal(null)}><BriefEditor brief={project.brief} onChange={updateBrief} onReview={saveBrief} busy={busy} /><div className="campaign-delete-action"><button className="text-button" disabled={deletionBlocked} onClick={() => setModal('delete')}>Delete campaign</button>{deletionBlocked && <p className="footnote">Wait for current production, chat or export to finish.</p>}</div>{error && <p className="notice mt-4" role="alert">{error}</p>}</Modal>}
+    {modal === 'delete' && <Modal title="Delete campaign?" onClose={() => setModal(null)}><p>Delete “{project.brief.title || 'Untitled campaign'}” and its brief, chat and saved settings from this browser?</p><p className="footnote mt-3">Export anything you want to keep first. This cannot be undone. Wallet funds, on-chain transactions and server payment records are not deleted.</p><div className="flex flex-wrap gap-3 mt-6"><button className="button secondary" onClick={() => setModal(null)}>Keep campaign</button><button className="button secondary" disabled={deletionBlocked} onClick={deleteCampaign}>Delete campaign</button></div></Modal>}
     {modal === 'invitation' && <Modal title="Invite guests" onClose={() => setModal(null)}><InvitationPanel brief={project.brief} onChange={updateBrief} /></Modal>}
     {modal === 'direction' && project.plan && <Modal title="Creative direction" onClose={() => setModal(null)}><DirectionEditor plan={project.plan} stale={stale} onChange={updatePlan} onConfirm={confirmCopy} />{error && <p className="notice mt-4" role="alert">{error}</p>}</Modal>}
     {modal === 'narration' && <Modal title="Campaign narration" onClose={() => setModal(null)}><NarrationPanel key={project.id} script={project.plan?.narration || ''} uploaded={uploaded} paidAudio={paidAudio} stale={stale} providerUnavailable={providerUnavailable} onSave={saveNarration} onRemove={removeNarration} onReview={() => project.plan ? setModal('direction') : setModal('edit')} onPurchase={() => { setModal(null); setAgentOpen(true); void purchase('voice') }} /></Modal>}

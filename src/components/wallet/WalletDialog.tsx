@@ -33,12 +33,12 @@ export function WalletDialog({ wallet, onClose, onRefresh }: { wallet: Wallet; o
   }
   return <Modal title={wallet.connected ? 'Your production wallet' : 'Connect Binance Wallet'} onClose={onClose}>
     {wallet.connected ? <>
-      <div className="connection-success"><ShieldCheck size={24} /><div><strong>Connected on this computer</strong><p>Binance Agentic Wallet · BNB Chain</p></div></div>
+      <div className="connection-success"><ShieldCheck size={24} /><div><strong>Connected to your studio</strong><p>Binance Agentic Wallet · BNB Chain</p></div></div>
       <label className="field mt-6">Your BNB Chain wallet address<div className="address-box"><code>{wallet.address || 'No BNB Chain address returned'}</code>{wallet.address && <button className="icon-button" aria-label="Copy wallet address" onClick={() => { void navigator.clipboard.writeText(wallet.address!).then(() => setCopied(true)) }}>{copied ? <Check size={16} /> : <Copy size={16} />}</button>}</div></label>
       <p className="text-sm text-muted my-5">Request a live quote before funding. The current provider accepts U (United Stables) on BNB Chain. Match the full token contract in the purchase review. Your exchange balance and MCP trading account are separate from this wallet.</p>
       <button className="button secondary" disabled={busy} onClick={() => void disconnect()}>Disconnect wallet</button>
     </> : <>
-      <p className="text-muted mb-6">Connect once. Review every purchase. Your wallet signs locally through Binance’s official Agentic Wallet software.</p>
+      <p className="text-muted mb-6">Connect once. Review every purchase. Commission uses Binance’s official Agentic Wallet software to request payment signatures for your studio.</p>
       <ol className="setup-steps">
         <li><span>1</span><div><strong>Set up Binance Wallet in the app</strong><p>Open the Binance app’s Wallet section. Create your wallet if needed and finish the setup and backup prompts.</p></div></li>
         <li><span>2</span><div><strong>Open the official pairing page</strong><p>Use the button below, then scan its QR code with the Binance app.</p></div></li>

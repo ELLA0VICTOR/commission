@@ -3,7 +3,7 @@
   <h1>Commission</h1>
   <p><strong>An independent production studio for event campaigns.</strong></p>
   <p>One brief. Coordinated creative direction, purchased artwork, and campaign files.<br />A conversational workspace with user-approved Binance B402 payments.</p>
-  <p><a href="#quick-start">Quick start</a> &middot; <a href="#architecture">Architecture</a> &middot; <a href="#local-api">API reference</a> &middot; <a href="LICENSE">MIT license</a></p>
+  <p><a href="#quick-start">Quick start</a> &middot; <a href="#public-deployment">Deployment</a> &middot; <a href="#architecture">Architecture</a> &middot; <a href="#http-api">API reference</a> &middot; <a href="LICENSE">MIT license</a></p>
   <p>
     <img src="https://img.shields.io/badge/React-19-20232A?style=for-the-badge&amp;logo=react&amp;logoColor=61DAFB" alt="React 19" />
     <img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 6" />
@@ -21,7 +21,7 @@
 
 ## Overview
 
-Commission combines event briefing, creative-service purchases, and file assembly in a local workspace. Event details remain editable independently of the purchased image, allowing the same artwork to support an updated poster, vertical story, and animated promo.
+Commission combines event briefing, creative-service purchases, and file assembly in a browser workspace. Event details remain editable independently of the purchased image, allowing the same artwork to support an updated poster, vertical story, and animated promo.
 
 The conversational agent interprets requests, updates brief fields, revises existing creative copy, and requests production quotes. The user reviews the exact price before payment is signed. Manual editing and direct production controls remain available without a conversational-model API key.
 
@@ -35,7 +35,7 @@ The conversational agent interprets requests, updates brief fields, revises exis
 | Narration | Optionally include purchased audio or an uploaded MP3/WAV. |
 | Receipts | Associate delivery results and settlement evidence with each campaign. |
 
-Commission is a **local, single-user application**. Its Express service connects to the locally authorized wallet. A static frontend deployment alone does not provide this functionality.
+Commission supports **local single-user operation** and **hosted studios with separate accounts and wallet sessions**. Its Express service handles wallet operations and production. A static frontend deployment alone does not provide this functionality.
 
 ## Quick start
 
@@ -224,13 +224,36 @@ Use **Export → Optional voiceover**. MP3/WAV uploads are limited to **10 MB** 
 
 Uploads are labelled separately from B402 purchases and create no receipt. Script changes require replacing or reconfirming the recording. Removing audio detaches it without deleting the original. Provider speech availability does not block completion.
 
-## Local API
+## Public deployment
 
-Express binds to `127.0.0.1:4317` and checks local Host/Origin allowlists. Mutations require the token from `GET /api/session` in an `X-Commission-Session` header. Tokens change on restart. This is a local request control, not public-service authentication.
+The built frontend and Express API run together in **one service**. A separate Vercel frontend is not required. [Dockerfile](Dockerfile) and [render.yaml](render.yaml) provide a Docker deployment with a persistent disk; this is a single-instance architecture.
+
+1. Push this repository to GitHub, then create a Render Blueprint from the repository.
+2. Review the paid service and disk charges before creating the service. Render's free web service does not preserve these files across restarts.
+3. Set `OPENAI_API_KEY` through Render's secret environment settings. Never commit `.env` or copy local wallet credentials to the host.
+4. The blueprint sets public mode, the data directory, a generated secret, and conversation limits. Render's `RENDER_EXTERNAL_URL` supplies the allowed origin. For another host or a custom domain, set `COMMISSION_PUBLIC_ORIGIN` to the exact HTTPS origin, with no path.
+5. Keep `COMMISSION_SESSION_SECRET` unchanged and back up the persistent disk. The secret derives each studio's wallet-instance identity; rotating it can require users to pair again.
+6. After deployment, create two test studios and verify login, isolated receipts, and pairing with each user's own Binance account. Confirm Binance availability from the chosen host before relying on hosted payments. Browser-local wallet authorization is not transferred to the deployment.
+
+Public mode provides username/password sign-in with scrypt password hashes, HttpOnly SameSite cookies, origin checks, and per-studio mutation tokens. Each account has separate orders, media, provider responses, quotes, and Binance CLI storage. Server restarts invalidate login sessions; users can sign in again. Signing out ends the browser session; **Disconnect wallet** separately revokes the studio's wallet connection. Password recovery and cross-device draft synchronization are not implemented.
+
+The Docker image intentionally has no OS keyring. Binance CLI uses its encrypted-file fallback with a distinct `BINANCE_BAW_DIR` and derived `BINANCE_INSTANCE_ID` per studio. Public mode refuses to start wallet operations in an environment with an accessible shared OS keyring because the CLI's keyring entry is global. Wallet authorization lives on the host, so the server operator remains part of the trust boundary; this is not browser-only signing.
+
+Default limits are **100 AI conversation turns per UTC day across the deployment**, **20 per account**, **100 accounts**, and **60 write requests per account per 15 minutes**. Authentication has a separate IP limit. Daily conversation counters persist across restarts; one turn can use up to four model calls. These limits are not a dollar spending guarantee. Set lower `COMMISSION_AI_DAILY_LIMIT` / `COMMISSION_AI_USER_DAILY_LIMIT` values for a small demo budget.
+
+Local mode remains the default (`COMMISSION_PUBLIC=0`) and preserves the existing local wallet and workspace. Hosted data is stored beneath `COMMISSION_DATA_DIR/users/<account-id>/`; account password hashes and AI usage counters are stored at the data root. Only paths inside the persistent disk survive redeploys. Follow the host's backup procedure before updating a live installation.
+
+## HTTP API
+
+Local mode binds to `127.0.0.1:4317`. Public mode binds to `0.0.0.0:$PORT` and requires an authenticated studio for production endpoints. Both modes validate Host/Origin and require the token from `GET /api/session` in an `X-Commission-Session` header for studio mutations. Tokens change on restart.
 
 | Method | Route | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/health` | Service identity and operating mode. |
+| `GET` | `/api/access` | Hosting mode and signed-in account. |
+| `POST` | `/api/auth/register` | Create a hosted studio. |
+| `POST` | `/api/auth/login` | Start an authenticated session. |
+| `POST` | `/api/auth/logout` | End the current browser session. |
 | `GET` | `/api/session` | Local mutation token. |
 | `GET` | `/api/agent/status` | Model/key configuration; does not verify credit. |
 | `POST` | `/api/agent/message` | Conversation turn, edits, quote, or panel action. |
@@ -245,7 +268,7 @@ Express binds to `127.0.0.1:4317` and checks local Host/Origin allowlists. Mutat
 | `POST` | `/api/narration/upload` | Binary `audio/mpeg` or `audio/wav` upload. |
 | `GET` | `/api/assets/:filename` | Saved media. |
 
-JSON bodies are limited to 64 KB; audio has a separate 10 MB limit. Conversation allows one in-flight turn per campaign and two concurrent turns across the service. See [shared/domain.ts](shared/domain.ts), [shared/agent.ts](shared/agent.ts), and [server/index.ts](server/index.ts) for schemas and handlers.
+JSON bodies are limited to 64 KB; audio has a separate 10 MB limit. Conversation allows one in-flight turn per campaign and two concurrent turns per studio. See [shared/domain.ts](shared/domain.ts), [shared/agent.ts](shared/agent.ts), and [server/studio.ts](server/studio.ts) for schemas and production handlers.
 
 ## Storage and privacy
 
@@ -258,11 +281,13 @@ JSON bodies are limited to 64 KB; audio has a separate 10 MB limit. Conversation
 | OpenAI credentials | Local `.env` or process environment |
 | Wallet authorization | Storage managed by the official Agentic Wallet CLI |
 
-Commission does not synchronize or encrypt local campaign data. Clearing browser storage removes draft associations even if media remains. Back up browser drafts and server files together when moving the workspace.
+Commission does not synchronize or encrypt browser campaign data. Hosted drafts use the account-scoped key `commission.projects.v2.<account-id>`. Clearing browser storage removes draft associations even if media remains. Back up browser drafts and server files together when moving the workspace.
+
+Use **Edit brief → Delete campaign** to remove a campaign's draft, conversation, and saved settings from the current browser. A confirmation is required, and deletion is disabled during active work. Deleting the last campaign opens an empty draft. Downloaded exports, server media/payment records, and blockchain transactions remain intact.
 
 Conversation sends relevant context to OpenAI using `store: false`. This does not make requests local or replace provider data policies. Production inputs go to Xona. Wallet credentials and payment signatures are not included in model context or frontend responses.
 
-`.env`, local data, wallet directories, and test artifacts are Git-ignored. Provider downloads use validated public HTTPS sources with size limits. Public hosting requires a separate authentication, authorization, and deployment design.
+`.env`, local data, wallet directories, and test artifacts are excluded from Git and Docker build context. Provider downloads use validated public HTTPS sources with size limits. Public hosting uses the isolation and authentication described above.
 
 ## Development
 
@@ -285,6 +310,7 @@ commission/
 ├── public/                     Branding assets
 ├── src/
 │   ├── components/
+│   │   ├── account/            Public studio sign-in and registration
 │   │   ├── agent/              Conversation and production controls
 │   │   ├── campaign/           Brief, direction, preview, progress, narration
 │   │   ├── layout/             Navigation and workspace shell
@@ -298,6 +324,9 @@ commission/
 │   ├── domain.ts               Campaign, wallet, order, and quote types
 │   └── agent.ts                Conversation schemas
 ├── server/
+│   ├── accounts.ts             Hosted accounts and login sessions
+│   ├── usage.ts                Persisted daily AI limits
+│   ├── studio.ts               Per-account production routes
 │   ├── agent.ts                Validated conversational tools
 │   ├── agent-model.ts          OpenAI transport and configuration
 │   ├── wallet.ts               Agentic Wallet CLI adapter
@@ -307,10 +336,12 @@ commission/
 │   ├── settlement.ts           Settlement-evidence validation
 │   ├── store.ts                Orders and saved responses
 │   ├── audio-upload.ts         Narration validation and storage
-│   └── index.ts                Local HTTP API
+│   └── index.ts                HTTP entry point and account isolation
 ├── scripts/                    Provider diagnostics
 ├── tests/                      Unit and browser tests
 ├── .env.example                Environment configuration template
+├── Dockerfile                  Headless Node deployment image
+├── render.yaml                 Single-service hosting blueprint
 ├── package.json                Dependencies and commands
 ├── vite.config.ts              Frontend development configuration
 ├── playwright.config.ts        Browser test configuration

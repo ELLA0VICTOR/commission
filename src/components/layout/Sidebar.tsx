@@ -1,8 +1,9 @@
 import { ArrowUpRight, BookOpen, ChevronRight, FolderClosed, Plus, WalletCards } from '../ui/Icons'
 import type { Project, Wallet } from '../../../shared/domain'
-export function Sidebar({ projects, activeId, onSelect, onCreate, onWallet, wallet, onGuide }: {
+export function Sidebar({ projects, activeId, onSelect, onCreate, onWallet, wallet, onGuide, username, onSignOut, locked }: {
   projects: Project[]; activeId: string; onSelect: (id: string) => void; onCreate: () => void;
   onWallet: () => void; wallet: Wallet; onGuide: () => void;
+  username?: string; onSignOut?: () => void; locked?: boolean;
 }) {
   return <aside className="sidebar">
     <a href="/" className="brand" aria-label="Commission home"><img src="/favicon.svg" width="32" height="32" alt="" /><span>commission<span className="brand-accent">.</span></span></a>
@@ -18,7 +19,7 @@ export function Sidebar({ projects, activeId, onSelect, onCreate, onWallet, wall
       <div className="studio-note"><span className="mini-symbol">c.</span><p>A small brief.<br />A whole campaign.</p><span>Your agent handles production.<br />You keep creative control.</span></div>
       <button className="nav-item" onClick={onGuide}><BookOpen size={17} /> How it works <ArrowUpRight size={14} className="ml-auto" /></button>
       <button className="wallet-nav" onClick={onWallet}><WalletCards size={18} /><span>{wallet.connected ? 'Wallet connected' : 'Connect your wallet'}<small>{wallet.connected ? 'Binance Agentic Wallet' : 'Powered by Binance'}</small></span><span className={'status-dot ' + (wallet.connected ? 'connected' : '')} /></button>
-      <div className="sidebar-foot"><span>Commission Studio</span><span>Local workspace</span></div>
+      <div className="sidebar-foot"><span>{username || 'Commission Studio'}</span>{onSignOut ? <button className="text-button" disabled={locked} onClick={onSignOut}>Sign out</button> : <span>Local workspace</span>}</div>
     </div>
   </aside>
 }

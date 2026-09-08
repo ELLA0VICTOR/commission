@@ -1,5 +1,5 @@
-import { rsvpUrlSchema, type Brief } from '../../shared/domain'
-import { dateLabel } from './projects'
+import { rsvpUrlSchema, type Brief } from '../../shared/domain.ts'
+import { dateLabel } from './projects.ts'
 
 export function invitationUrl(brief: Brief) {
   const result = rsvpUrlSchema.safeParse(brief.rsvpUrl || '')

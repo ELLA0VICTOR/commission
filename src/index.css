@@ -469,6 +469,12 @@ button:disabled { color: var(--text-faint); opacity: 1; }
 .invitation-calendar { border-block: 1px solid var(--border-subtle); padding-block: 18px; display: flex; flex-direction: column; gap: 12px; }
 .invitation-calendar h3 { font-size: 15px; color: var(--text-primary); }
 .invitation-calendar input { min-width: 0; }
+.campaign-delete-action { border-top: 1px solid var(--border-subtle); padding-top: 18px; margin-top: 18px; }
+.studio-access { min-height: 100dvh; display: grid; place-items: center; padding: 32px 24px; background: var(--bg-base); }
+.access-content { width: 100%; max-width: 430px; display: flex; flex-direction: column; gap: 24px; }
+.access-content h1 { font-size: 32px; line-height: 1.15; }
+.access-content .brand { margin-bottom: 24px; }
+.access-form { display: flex; flex-direction: column; gap: 20px; }
 .preview-modal .footnote { flex-shrink: 0; margin: 0; text-align: center; }
 @media (max-width: 700px) {
   .preview-modal { width: calc(100vw - 24px); height: calc(100dvh - 32px); max-height: calc(100dvh - 32px); }

@@ -1,7 +1,8 @@
 import { z } from 'zod'
-import { draftBriefSchema } from '../../shared/agent'
-import { defaultBrief, uploadedNarrationSchema, type Project } from '../../shared/domain'
-const key = 'commission.projects.v2'
+import { draftBriefSchema } from '../../shared/agent.ts'
+import { defaultBrief, uploadedNarrationSchema, type Project } from '../../shared/domain.ts'
+let key = 'commission.projects.v2'
+export function setProjectScope(userId?: string) { key = userId ? 'commission.projects.v2.' + userId : 'commission.projects.v2' }
 const draftPlan = z.object({ concept: z.string().max(500), imagePrompt: z.string().max(1800), narration: z.string().max(700), caption: z.string().max(1600) })
 export function createProject(): Project {
   return { id: crypto.randomUUID(), brief: { ...defaultBrief, title: '', subtitle: '', date: '', time: '', venue: '', callToAction: '', details: '' }, createdAt: new Date().toISOString() }
