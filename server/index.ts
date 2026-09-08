@@ -1,3 +1,6 @@
+import { agentRequestSchema } from '../shared/agent.ts'
+import { runAgent } from './agent.ts'
+import { agentStatus } from './agent-model.ts'
 import { saveUploadedAudio } from './audio-upload.ts'
 import express from 'express'
 import { fulfill } from './fulfillment.ts'
@@ -30,7 +33,7 @@ app.use((req, res, next) => {
   }
   next()
 })
-app.use(express.json({ limit: '20kb' }))
+app.use(express.json({ limit: '64kb' }))
 app.use('/api/assets', express.static(assetDir, { dotfiles: 'deny' }))
 app.get('/api/session', (_req, res) => res.json({ token: sessionToken }))
 app.get('/api/health', (_req, res) => res.json({ ok: true, mode: 'local', wallet: 'Binance Agentic Wallet', payments: 'B402 / BNB Chain' }))
@@ -95,8 +98,7 @@ function publicQuote(quote: InternalQuote): Quote {
   const { id, projectId, service, amount, token, tokenAddress, payTo, expiresAt, ready, reasons } = quote
   return { id, projectId, service, amount, token, tokenAddress, payTo, expiresAt, ready, reasons }
 }
-app.post('/api/quotes', async (req, res) => {
-  const input = purchaseSchema.parse(req.body)
+async function prepareQuote(input: z.infer<typeof purchaseSchema>) {
   assertPurchaseState(orders, input.projectId, input.service, input.retryOf)
   const body = requestBody(input.service, input.brief, input.plan)
   const inputKey = fingerprint(body)
@@ -127,7 +129,19 @@ app.post('/api/quotes', async (req, res) => {
     paymentId: preview.paymentId, index: option.index, body, inputKey, budget: input.brief.budget, brief: input.brief, retryOf: input.retryOf,
   }
   quotes.set(quote.id, quote)
-  res.json(publicQuote(quote))
+  return publicQuote(quote)
+}
+app.post('/api/quotes', async (req, res) => { res.json(await prepareQuote(purchaseSchema.parse(req.body))) })
+
+app.get('/api/agent/status', (_req, res) => res.json(agentStatus()))
+const agentRuns = new Set<string>()
+app.post('/api/agent/message', async (req, res) => {
+  const input = agentRequestSchema.parse(req.body)
+  if (agentRuns.has(input.projectId) || agentRuns.size >= 2) { res.status(429).json({ error: 'The agent is still working. Wait for its reply before sending another message.' }); return }
+  agentRuns.add(input.projectId)
+  try {
+    res.json(await runAgent(input, orders, { quote: (service, brief, plan) => prepareQuote({ projectId: input.projectId, service, brief, plan }) }))
+  } finally { agentRuns.delete(input.projectId) }
 })
 
 app.post('/api/purchases', async (req, res) => {

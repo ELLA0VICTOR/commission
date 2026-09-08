@@ -1,3 +1,4 @@
+import type { AgentTurn } from '../shared/agent'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowDownToLine, ArrowUpRight, ChevronRight, CircleHelp, Menu, Message, ReceiptText, X } from './components/ui/Icons'
 import { briefSchema, planSchema, serviceNames, type Brief, type Order, type Plan, type Project, type Quote, type Service, type Wallet, type UploadedNarration } from '../shared/domain'
@@ -9,7 +10,7 @@ import { ProgressStrip } from './components/campaign/ProgressStrip'
 import { NarrationPanel } from './components/campaign/NarrationPanel'
 import { DirectionEditor } from './components/campaign/DirectionEditor'
 import { AgentPanel } from './components/agent/AgentPanel'
-import { chatMessage, respond, type AgentAction } from './lib/conversation'
+import { chatMessage, type AgentAction } from './lib/conversation'
 import { WalletDialog } from './components/wallet/WalletDialog'
 import { WalletControl } from './components/wallet/WalletControl'
 import { PurchaseDialog } from './components/wallet/PurchaseDialog'
@@ -27,6 +28,11 @@ export default function App() {
   const [modal, setModal] = useState<'wallet' | 'guide' | 'preview' | 'receipts' | 'edit' | 'direction' | 'export' | 'narration' | null>(null)
   const [quote, setQuote] = useState<Quote>()
   const [busy, setBusy] = useState(false)
+  const [agentThinking, setAgentThinking] = useState(false)
+  const [agentConfigured, setAgentConfigured] = useState<boolean>()
+  const agentPending = useRef(false)
+  const activeProjectRef = useRef(activeId)
+  useEffect(() => { activeProjectRef.current = activeId }, [activeId])
   const [exporting, setExporting] = useState('')
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState('')
@@ -64,6 +70,7 @@ export default function App() {
     catch (error) { setWallet({ connected: false, error: (error as Error).message }) }
   }, [])
   useEffect(() => {
+    void api<{ configured: boolean }>('/agent/status').then(status => setAgentConfigured(status.configured)).catch(() => setAgentConfigured(false))
     void api<Wallet>('/wallet').then(setWallet).catch(error => setWallet({ connected: false, error: (error as Error).message }))
     let alive = true
     async function refreshOrders() {
@@ -100,19 +107,42 @@ export default function App() {
     setError('')
     commit(projectsRef.current.map(item => item.id === project.id ? { ...item, messages: [], agentField: undefined } : item))
   }
-  function sendMessage(text: string) {
+  async function sendMessage(text: string) {
+    if (agentPending.current || busy) return
     const current = projectsRef.current.find(item => item.id === project.id)!
-    const result = respond(current, text)
-    commit(projectsRef.current.map(item => item.id === current.id ? {
-      ...item, brief: result.brief || item.brief, agentField: result.field,
-      briefConfirmed: result.confirmed || item.briefConfirmed,
-      messages: [...(item.messages || []), chatMessage('user', text), chatMessage('agent', result.reply)].slice(-150),
-    } : item))
-    if (result.action && result.action !== 'brief') void agentAction(result.action, false)
+    const snapshot = JSON.stringify({ brief: current.brief, plan: current.plan })
+    agentPending.current = true; setAgentThinking(true); setError('')
+    commit(projectsRef.current.map(item => item.id === current.id ? { ...item, messages: [...(item.messages || []), chatMessage('user', text)].slice(-150) } : item))
+    try {
+      const result = await api<AgentTurn>('/agent/message', {
+        projectId: current.id, brief: current.brief, plan: current.plan, planKey: current.planKey,
+        message: text, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        history: (current.messages || []).slice(-12).map(message => ({ role: message.role, text: message.text.slice(0, 1000) })),
+      })
+      const latest = projectsRef.current.find(item => item.id === current.id)
+      if (!latest) return
+      if (JSON.stringify({ brief: latest.brief, plan: latest.plan }) !== snapshot) {
+        say('The campaign changed while I was thinking, so I kept your newer edits. Please send your request again.', current.id)
+        return
+      }
+      const copyChanged = JSON.stringify(result.plan) !== JSON.stringify(current.plan)
+      commit(projectsRef.current.map(item => item.id === current.id ? {
+        ...item, brief: result.brief, plan: result.plan, agentField: undefined,
+        planKey: copyChanged ? undefined : item.planKey,
+        briefConfirmed: briefSchema.safeParse(result.brief).success,
+        messages: [...(item.messages || []), chatMessage('agent', result.reply)].slice(-150),
+      } : item))
+      if (activeProjectRef.current === current.id) {
+        if (result.quote) setQuote(result.quote)
+        else if (result.panel) setModal(result.panel)
+      }
+    } catch (error) {
+      if (activeProjectRef.current === current.id) setError((error as Error).message)
+    } finally { agentPending.current = false; setAgentThinking(false) }
   }
   async function agentAction(action: AgentAction, announce = true) {
     setError('')
-    if (action === 'brief') { sendMessage('Build my brief'); return }
+    if (action === 'brief') { await sendMessage('Help me build my event brief. Ask only for details that are missing.'); return }
     if (action === 'voice' || action === 'upload') { setModal('narration'); return }
     if (action === 'direction' || action === 'image') {
       if (announce) say('I’ll check the current ' + (action === 'direction' ? 'creative direction' : action) + ' quote. You approve the exact price.')
@@ -206,7 +236,7 @@ export default function App() {
       </main>
     </div>
     {!agentOpen && !modal && !quote && <button className="agent-fab" aria-label="Open Agent" onClick={() => setAgentOpen(true)}><Message size={23} /></button>}
-    {agentOpen && !modal && !quote && <AgentPanel key={project.id} project={project} orders={projectOrders} busy={busy} error={error} onSend={sendMessage} onClear={clearChat} onAction={action => void agentAction(action)} onClose={() => setAgentOpen(false)} />}
+    {agentOpen && !modal && !quote && <AgentPanel key={project.id} project={project} orders={projectOrders} busy={busy || agentThinking} configured={agentConfigured} error={error} onSend={text => void sendMessage(text)} onClear={clearChat} onAction={action => void agentAction(action)} onClose={() => setAgentOpen(false)} />}
     {modal === 'edit' && <Modal title="Edit brief" onClose={() => setModal(null)}><BriefEditor brief={project.brief} onChange={updateBrief} onReview={saveBrief} busy={busy} />{error && <p className="notice mt-4" role="alert">{error}</p>}</Modal>}
     {modal === 'direction' && project.plan && <Modal title="Creative direction" onClose={() => setModal(null)}><DirectionEditor plan={project.plan} stale={stale} onChange={updatePlan} onConfirm={confirmCopy} />{error && <p className="notice mt-4" role="alert">{error}</p>}</Modal>}
     {modal === 'narration' && <Modal title="Campaign narration" onClose={() => setModal(null)}><NarrationPanel key={project.id} script={project.plan?.narration || ''} uploaded={uploaded} paidAudio={paidAudio} stale={stale} providerUnavailable={providerUnavailable} onSave={saveNarration} onRemove={removeNarration} onReview={() => project.plan ? setModal('direction') : setModal('edit')} onPurchase={() => { setModal(null); setAgentOpen(true); void purchase('voice') }} /></Modal>}

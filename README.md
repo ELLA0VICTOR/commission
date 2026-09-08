@@ -1,122 +1,329 @@
-# Commission
+<div align="center">
+  <img src="public/favicon.svg" alt="Commission logo" width="88" height="88" />
+  <h1>Commission</h1>
+  <p><strong>An independent production studio for event campaigns.</strong></p>
+  <p>One brief. Coordinated creative direction, purchased artwork, and campaign files.<br />A conversational workspace with user-approved Binance B402 payments.</p>
+  <p><a href="#quick-start">Quick start</a> &middot; <a href="#architecture">Architecture</a> &middot; <a href="#local-api">API reference</a> &middot; <a href="LICENSE">MIT license</a></p>
+  <p>
+    <img src="https://img.shields.io/badge/React-19-20232A?style=for-the-badge&amp;logo=react&amp;logoColor=61DAFB" alt="React 19" />
+    <img src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&amp;logo=typescript&amp;logoColor=white" alt="TypeScript 6" />
+    <img src="https://img.shields.io/badge/Vite-8-20232A?style=for-the-badge&amp;logo=vite&amp;logoColor=white" alt="Vite 8" />
+    <img src="https://img.shields.io/badge/Tailwind_CSS-4-0F172A?style=for-the-badge&amp;logo=tailwindcss&amp;logoColor=38BDF8" alt="Tailwind CSS 4" />
+    <br />
+    <img src="https://img.shields.io/badge/Node.js-22.12%2B-20232A?style=for-the-badge&amp;logo=nodedotjs&amp;logoColor=5FA04E" alt="Node.js 22.12 or newer" />
+    <img src="https://img.shields.io/badge/Express-5-20232A?style=for-the-badge&amp;logo=express&amp;logoColor=white" alt="Express 5" />
+    <img src="https://img.shields.io/badge/Binance-B402-181818?style=for-the-badge&amp;logo=binance&amp;logoColor=F0B90B" alt="Binance B402" />
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-C9A24A?style=for-the-badge&amp;labelColor=303030" alt="MIT license" /></a>
+  </p>
+</div>
 
-An independent production studio for event campaigns. An agent turns a brief into creative direction, buys creative direction and artwork from Xona through Binance B402, and assembles usable campaign files.
+---
 
-Built for Binance Agent OS Track A, Payment Workflows. The Agent OS integration is **Binance Agentic Wallet + B402**, not the trading MCP endpoint.
+## Overview
 
-## Run locally
+Commission combines event briefing, creative-service purchases, and file assembly in a local workspace. Event details remain editable independently of the purchased image, allowing the same artwork to support an updated poster, vertical story, and animated promo.
 
-Requires Node.js 22.12 or newer and npm. On Windows PowerShell, use npm.cmd if npm.ps1 is blocked.
+The conversational agent interprets requests, updates brief fields, revises existing creative copy, and requests production quotes. The user reviews the exact price before payment is signed. Manual editing and direct production controls remain available without a conversational-model API key.
 
-```powershell
-cd C:\Users\kolev\Desktop\commission
-npm.cmd install
-npm.cmd run dev
+| Capability | Behavior |
+| --- | --- |
+| Briefing | Collect event details, atmosphere, creative context, and a production budget. |
+| Direction | Purchase a concept, image prompt, narration script, and social caption from Xona. |
+| Artwork | Purchase an image using the creative direction; render event typography separately. |
+| Exports | Assemble a poster, story, caption, metadata, receipts, and a separate animated WebM promo. |
+| Revisions | Reuse artwork for date and venue changes; review affected copy before exporting. |
+| Narration | Optionally include purchased audio or an uploaded MP3/WAV. |
+| Receipts | Associate delivery results and settlement evidence with each campaign. |
+
+Commission is a **local, single-user application**. Its Express service connects to the locally authorized wallet. A static frontend deployment alone does not provide this functionality.
+
+## Quick start
+
+### Requirements
+
+- Node.js **22.12 or newer** and npm.
+- Recent Chrome or Microsoft Edge for canvas, audio, and WebM exports.
+- A Binance account and authorized **Binance Agentic Wallet** for paid production.
+- An OpenAI API key with API billing enabled for conversational editing; optional for manual controls.
+
+```sh
+git clone https://github.com/ELLA0VICTOR/commission.git
+cd commission
+npm ci
+npm run dev
 ```
 
-Open http://127.0.0.1:5173. The local API runs on port 4317. Keep the terminal running while pairing, purchasing, or producing assets.
+On Windows PowerShell, use `npm.cmd` if execution policy blocks `npm.ps1`.
 
-For the built application:
+Open **http://127.0.0.1:5173**. Vite proxies `/api` to Express at **http://127.0.0.1:4317**. Keep the terminal running during pairing, purchases, and delivery. Frontend edits reload automatically; restart after backend or environment changes. The wallet API does not automatically restart during purchases.
 
-```powershell
-npm.cmd run build
-npm.cmd start
+### AI configuration
+
+Copy `.env.example` to `.env` if a local `.env` does not already exist, then set:
+
+```dotenv
+OPENAI_API_KEY=your_openai_api_key
+COMMISSION_AGENT_MODEL=gpt-4.1-mini
 ```
 
-Then open http://127.0.0.1:4317. Only run one API process at a time. Stop the development process first.
+| Variable | Requirement | Purpose |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | For conversation | Authorizes server-side OpenAI Responses API requests. |
+| `COMMISSION_AGENT_MODEL` | Optional | Defaults to `gpt-4.1-mini`; must support Responses API function calling. |
 
-The current release is a **local, single-user application**. A static frontend deployment alone cannot connect to this wallet backend. Do not expose the API or its wallet session publicly.
+Restart the API after saving. Keep credentials server-side; never use a `VITE_*` variable for a secret. `.env` is Git-ignored and `.env.example` contains placeholders only.
 
-## Connect your wallet
+OpenAI usage is billed separately from Binance purchases and is outside the campaign's U budget. ChatGPT subscriptions do not include API usage. Manual editing, production controls, and existing exports remain available without funded API access.
 
-1. Sign in to the Binance app and open Binance Wallet. Complete wallet creation and the app's backup/setup prompts if needed.
-2. In Commission, select **Connect wallet**, then **Start secure connection**.
-3. Select **Open Binance pairing page**. Commission uses the exact URL returned by the official wallet CLI.
-4. Scan the QR code with the Binance app. Match the pairing code shown in Commission with the app and approve.
-5. Leave Commission running until its wallet status is connected. The local wallet status, rather than the app's approval screen, is the final confirmation.
-6. Request a creative-direction quote. Before funding, check its full token contract, chain, amount, and recipient. The supported option in this release is **U (United Stables), BNB Chain**, contract **0xcE24439F2D9C6a2289F741120FE202248B666666**.
-7. Fund the displayed Agentic Wallet address with the exact supported token on BNB Chain. An exchange balance or MCP trading sub-account is separate.
-8. Request a fresh quote after funding. Review and approve its exact price inside Commission.
+### Built application
 
-No Binance API keys, seed phrases, or wallet session values go into the frontend or an .env file. Session storage is handled by Binance's official CLI. Never share its ~/.baw directory.
+Stop the development service before running:
 
-If the pairing code expires, start a fresh pairing. Do not edit backend files during pairing in development: its file watcher restarts the service. Use the built application for the live demo.
-
-## Campaign flow
-
-- Open **Agent** and choose **Build my brief**, or send a field edit such as `venue: The Listening Room`. Conversation and manual edits share the same saved brief and live preview. All fields remain available behind **Edit brief**.
-- Briefing uses a local guided conversation, not an additional language-model API. It supports field edits and production commands; paid AI creative direction still runs through Xona/B402.
-- Review a live quote for creative direction. After approval, GPT-5.2 produces a concept, image prompt, narration, and social caption.
-- Review or edit the generated direction. Commission passes the reviewed visual prompt to FLUX.2 Pro. Reviewed copy and delivered artwork complete the campaign; voiceover is optional.
-- Purchase those services individually with explicit price approval.
-- Download a PNG poster, PNG story, caption, and receipts in a ZIP, with narration included when selected. The animated vertical promo exports separately as **WebM**, with movement in the artwork and stationary event details. Audio is optional.
-- Date, time, and venue changes reuse the purchased image. Changes to the script make the previous voiceover ineligible for new exports. Review copy after brief changes before purchasing narration or exporting the pack.
-
-Before a purchase, the interface uses an explicitly labelled local layout preview. Preview PNG/ZIP and silent WebM exports are real files, but are **not evidence of paid AI generation**.
-
-## Uploaded narration fallback
-
-Open **Export > Optional voiceover**, or **Agent > Upload audio**. Upload an MP3 or WAV up to 60 seconds and 10 MB. Listen to it in the narration panel, then export the ZIP or narrated WebM. The file is saved under .commission-data/assets; its campaign association is saved in browser localStorage.
-
-Uploaded narration is clearly labelled and makes no wallet payment. Failed provider receipts remain visible. The ZIP includes voiceover-uploaded.mp3/wav and declares its source in campaign.json and READ-ME.txt. Editing the script excludes an older recording until you replace it or confirm that it still matches. Removing narration detaches it from the campaign without deleting the local original.
-
-Xona's speech endpoint returned a provider credit/spending-limit error during live testing on September 7. Commission disables the paid voice action when its saved records report that error. The campaign can be completed without narration. Optional uploads do not resolve or refund those earlier purchases.
-
-## Payments and failure handling
-
-The server requests an unsigned HTTP 402 challenge from a fixed Xona endpoint, passes the whole original challenge to the official Agentic Wallet preview command, and presents the exact supported option to the user. It signs only after the approval action.
-
-- The initial integration supports exact U payments on BNB Chain using EIP-3009 without a token-approval transaction. Other tokens, networks, merchants, or payment methods are rejected.
-- Budgets use integer token arithmetic with 18 decimals. Pending and uncertain purchases reserve their full cost.
-- Purchase intent is persisted before signing. Duplicate requests reuse the existing receipt. An unresolved purchase blocks further purchases in that campaign.
-- A signed request is sent once. An ambiguous network error does not trigger another payment.
-- Provider responses are saved before asset parsing/download. When a response exists, **Retry saved delivery** can retry parsing/downloading it without calling the wallet or making another payment.
-- Delivery and settlement are separate. A file is not labelled settled simply because it arrived. Receipt links use a transaction hash from the provider's PAYMENT-RESPONSE header or a validated B402 payment object in its response body; the app does not independently verify blockchain finality.
-- If a response was lost after authorization, inspect the Binance wallet transaction history and contact the provider as necessary. This version does not automatically reconcile that case or issue refunds.
-
-The provider's merchant address is pinned to the address verified during development. Any change requires an explicit integration review.
-
-## Data and privacy
-
-Briefs and editable plans live in browser localStorage. Receipts, saved provider responses, and downloaded originals live in .commission-data/ on this computer. That directory and .env files are gitignored. Keep the same browser origin when returning to a draft.
-
-The backend binds to 127.0.0.1, validates Host/Origin, requires a local session token on mutations, and keeps signing headers out of browser responses. Asset downloads accept bounded public HTTPS responses. This is not a hosted multi-user wallet service.
-
-## Checks
-
-```powershell
-npm.cmd run build
-npm.cmd run lint
-npm.cmd test
-npm.cmd run test:e2e
-npm.cmd exec tsx scripts/check-provider.ts
+```sh
+npm run build
+npm start
 ```
 
-Browser tests use installed Microsoft Edge in a separate headless profile. They cover responsive editing, draft persistence, wallet/purchase dialogs, accessibility, real PNG/ZIP/WebM exports, and explicit purchase approval using browser-only fixtures. Unit tests cover exact budgets, supported payment requirements, failed deliveries, receipt handling, and no automatic repayment.
+Open **http://127.0.0.1:4317**. Express serves the built frontend and API. `npm run preview` serves only the Vite build and does not replace `npm start`.
 
-The provider-check script sends **unsigned requests only**. On September 6, 2026, the example brief returned valid B402 challenges: 0.014823 U for direction, 0.05 U for artwork, and 0.01 U for voice. Prices are live quotes, not constants.
+Browser drafts are origin-specific: ports `5173` and `4317` have separate browser storage, although both use the server's local media and receipt directory.
 
-**Live test status:** creative direction and artwork were purchased and delivered, and the campaign was exported. Paid speech failed because of the provider credit limit; it is not a successful paid delivery. Optional uploaded narration was separately verified in ZIP and WebM exports without additional payments.
+## Wallet setup
 
-## Structure
+1. Select **Connect wallet** and start a secure connection.
+2. Open the Binance pairing URL, follow the app's authorization flow, and verify the pairing code.
+3. Keep Commission running until its local wallet connection is confirmed.
+4. Complete a brief and request a creative-direction quote.
+5. Inspect the full token contract, network, recipient, and amount before funding.
+6. Fund the displayed Agentic Wallet address with the supported token on that network, then request a fresh quote.
+7. Approve the exact price in Commission.
 
-- src/components/layout — navigation and workspace shell.
-- src/components/campaign — brief editor, poster renderer, previews, and production progress.
-- src/components/agent ? conversation, production actions, and settlement receipts.
-- src/components/wallet — pairing and exact-price approval.
-- src/lib — local drafts, API client, and lazily loaded export tools.
-- shared — typed and validated campaign data.
-- server — local wallet adapter, payment policy, provider transport, durable receipts, and recovery.
-- tests — payment failure tests and real-browser workflow checks.
+The Agentic Wallet is separate from the exchange balance and MCP trading sub-account. The official `@binance/agentic-wallet` package manages authorization. Commission does not request seed phrases or exchange API keys.
 
-The interface uses one pure-black, neutral-charcoal, and bright-gold theme, Tailwind CSS, locally bundled Hanken Grotesk, custom line-art SVG glyphs, and custom SVG artwork. The live invitation leads the layout, above a five-step progress strip and settlement footer. The floating Agent panel handles briefing and production; settled purchases appear as inline receipts. A CSS-only assembly sequence respects reduced-motion preferences and does not affect exported files. Preview artwork is code-generated; paid artwork comes from the selected provider.
+Payment constraints are defined in [server/policy.ts](server/policy.ts):
 
-## Integration references
+| Parameter | Accepted value |
+| --- | --- |
+| Network | BNB Chain, chain ID `56`, identifier `eip155:56` |
+| Token | U (United Stables) |
+| Token contract | `0xcE24439F2D9C6a2289F741120FE202248B666666` |
+| Merchant | `0x515e7Bce44Baa5F6e42D16d4B5f27768E7f2F8cC` |
+| Scheme | `exact` |
+| Transfer | `eip3009`, without an additional token-approval transaction |
+| Campaign budget | `0.0001` to `10` U |
 
-- [Official Binance Agentic Wallet skill and references](https://github.com/binance/binance-skills-hub/tree/main/skills/binance-web3/binance-agentic-wallet)
+These are application constraints, not a universal list of Binance-supported options. Prices come from live quotes. Changes to accepted payment terms require updating the policy.
+
+## Campaign workflow
+
+**Brief → Direction → Artwork → Ready**
+
+1. **Brief:** describe the event to the agent or use **Edit brief**. New campaigns display an empty artwork canvas.
+2. **Direction:** request a quote and approve the purchase of the concept, image prompt, caption, and optional narration script.
+3. **Artwork:** review the direction and request an artwork quote. Delivered imagery appears beneath editable typography.
+4. **Ready:** review details and export. Add narration only if needed.
+
+Date, time, and venue edits reuse purchased artwork. Review affected copy after changing the brief. Audio is excluded from exports when it no longer matches the selected script.
+
+### Conversational tools
+
+Model-selected operations are validated on the server. Tool results are returned to the model before its reply.
+
+| Tool | Purpose | Boundary |
+| --- | --- | --- |
+| `update_brief` | Save selected event details. | Validate fields and dates; preserve untouched values. |
+| `update_copy` | Revise existing direction or caption. | Requires an existing plan and user review. |
+| `request_quote` | Prepare a direction or artwork quote. | Complete inputs required; unsigned quote only. |
+| `open_panel` | Open a workspace panel. | Does not approve copy, export files, or authorize payment. |
+
+Each message allows up to four model requests. Context includes the brief, existing copy, up to twelve recent messages, browser timezone, and that campaign's delivery records. The model has no signing, payment, refund, withdrawal, or recovery tool. Approval text in chat cannot authorize a purchase.
+
+Delayed responses cannot overwrite newer brief/copy edits or open another campaign's quote dialog. Connection failures are reported explicitly rather than replaced with scripted conversation.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    User[User] --> UI[React workspace]
+    UI --> API[Local Express API]
+    API <--> Model[OpenAI Responses API]
+    API --> Preview[Binance Wallet payment preview]
+    Preview --> Approval[Exact-price approval in UI]
+    Approval --> API
+    API --> Signing[Binance Wallet signature]
+    Signing --> Xona[Xona creative services]
+    Xona --> Store[Local media and receipts]
+    Store --> UI
+    UI --> Export[Browser PNG / ZIP / WebM export]
+```
+
+| Layer | Implementation |
+| --- | --- |
+| Frontend | React 19, TypeScript, Vite 8, Tailwind CSS 4. |
+| Visual system | Black and gold tokens, bundled Hanken Grotesk, custom SVG glyphs and poster composition. |
+| Conversation | OpenAI Responses API with allowlisted, Zod-validated tools. |
+| Binance | Official Agentic Wallet CLI invoked locally with JSON output; B402 challenges and signed requests. |
+| Production | Xona endpoints for GPT-5.2 direction, FLUX.2 Pro artwork, and optional speech. |
+| Persistence | Browser `localStorage` and filesystem media, orders, and responses. |
+| Exports | SVG-to-canvas rendering, `fflate`, Web Audio, and `MediaRecorder`. |
+
+Agentic Wallet and B402 are the Binance Agent OS components used by Commission. Exchange trading through Binance MCP is not part of the execution path.
+
+## Payment execution and recovery
+
+1. Request production from the provider and read its HTTP `402` challenge.
+2. Validate terms and pass the original challenge to `x402-payment preview`.
+3. Compare normalized wallet terms with the challenge, check the budget, and prepare a quote with a two-minute approval window.
+4. After exact-price approval, persist purchase intent before calling `x402-payment sign`.
+5. Send the signed request once, save the response, and record output and settlement evidence.
+
+Budgets use integer arithmetic with 18 decimal token units. Recorded purchases, including pending and uncertain purchases, count toward the ceiling. Duplicate approvals reuse an existing order instead of signing again.
+
+Delivery and settlement are independent. A file does not prove settlement. Evidence comes from a provider `PAYMENT-RESPONSE` header or validated B402 response body; Commission does not independently establish blockchain finality.
+
+Ambiguous failures do not cause automatic repayment. **Retry saved delivery** reparses or downloads an existing recoverable response without signing another payment. Missing responses and unresolved transfers require wallet-history inspection. Commission does not issue refunds or automatically reconcile them.
+
+## Exports
+
+| Output | Format | Contents |
+| --- | --- | --- |
+| Poster | PNG, `900 × 1200` | Artwork and event typography, 3:4. |
+| Story | PNG, `900 × 1600` | Vertical 9:16 composition. |
+| Campaign package | ZIP | Images, caption, metadata, receipts, and selected audio. |
+| Animated promo | WebM, `900 × 1600` | Moving artwork with stationary typography and optional narration. |
+
+```text
+poster.png
+story.png
+caption.txt
+campaign.json
+READ-ME.txt
+narration-script.txt         # When a plan includes a script
+voiceover.mp3               # Purchased audio; extension follows the asset
+voiceover-uploaded.wav      # Uploaded audio; .mp3 or .wav
+```
+
+Only selected narration is included. `campaign.json` contains the brief, plan, artwork provenance, narration source, and receipts. WebM is exported separately.
+
+Keep the tab open during rendering. Video uses VP9/Opus or VP8/Opus when supported, with a WebM fallback. Without narration, the promo is silent. Exports without purchased artwork use an explicitly labelled local layout preview.
+
+### Optional narration
+
+Use **Export → Optional voiceover**. MP3/WAV uploads are limited to **10 MB** and **60 seconds**. The browser checks decodability and duration; the server checks size, media type, and file signature.
+
+Uploads are labelled separately from B402 purchases and create no receipt. Script changes require replacing or reconfirming the recording. Removing audio detaches it without deleting the original. Provider speech availability does not block completion.
+
+## Local API
+
+Express binds to `127.0.0.1:4317` and checks local Host/Origin allowlists. Mutations require the token from `GET /api/session` in an `X-Commission-Session` header. Tokens change on restart. This is a local request control, not public-service authentication.
+
+| Method | Route | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/health` | Service identity and operating mode. |
+| `GET` | `/api/session` | Local mutation token. |
+| `GET` | `/api/agent/status` | Model/key configuration; does not verify credit. |
+| `POST` | `/api/agent/message` | Conversation turn, edits, quote, or panel action. |
+| `GET` | `/api/wallet` | Connection and BNB Chain address. |
+| `GET` | `/api/wallet/pairing` | Pairing progress. |
+| `POST` | `/api/wallet/connect` | Begin or reuse pairing. |
+| `POST` | `/api/wallet/disconnect` | Sign out when no purchase is processing. |
+| `POST` | `/api/quotes` | Prepare an unsigned quote. |
+| `POST` | `/api/purchases` | Authorize a saved quote ID and exact amount. |
+| `GET` | `/api/orders` | Order, delivery, and settlement records. |
+| `POST` | `/api/orders/:id/recover` | Recover a saved response. |
+| `POST` | `/api/narration/upload` | Binary `audio/mpeg` or `audio/wav` upload. |
+| `GET` | `/api/assets/:filename` | Saved media. |
+
+JSON bodies are limited to 64 KB; audio has a separate 10 MB limit. Conversation allows one in-flight turn per campaign and two concurrent turns across the service. See [shared/domain.ts](shared/domain.ts), [shared/agent.ts](shared/agent.ts), and [server/index.ts](server/index.ts) for schemas and handlers.
+
+## Storage and privacy
+
+| Data | Location |
+| --- | --- |
+| Briefs, copy, chat, narration metadata | Browser `localStorage`: `commission.projects.v2` |
+| Orders and settlement evidence | `.commission-data/orders.json` |
+| Provider responses | `.commission-data/<order-id>.response.json` |
+| Media | `.commission-data/assets/` |
+| OpenAI credentials | Local `.env` or process environment |
+| Wallet authorization | Storage managed by the official Agentic Wallet CLI |
+
+Commission does not synchronize or encrypt local campaign data. Clearing browser storage removes draft associations even if media remains. Back up browser drafts and server files together when moving the workspace.
+
+Conversation sends relevant context to OpenAI using `store: false`. This does not make requests local or replace provider data policies. Production inputs go to Xona. Wallet credentials and payment signatures are not included in model context or frontend responses.
+
+`.env`, local data, wallet directories, and test artifacts are Git-ignored. Provider downloads use validated public HTTPS sources with size limits. Public hosting requires a separate authentication, authorization, and deployment design.
+
+## Development
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start Express and Vite. |
+| `npm run build` | Type-check and produce `dist/`. |
+| `npm start` | Serve the built application and API. |
+| `npm run lint` | Run ESLint. |
+| `npm test` | Server, payment, model-adapter, and upload unit tests. |
+| `npm run test:e2e` | Playwright browser workflows. |
+| `npm exec tsx scripts/check-provider.ts` | Inspect unsigned provider challenges. |
+
+Browser tests use Microsoft Edge and a Windows launch command in [playwright.config.ts](playwright.config.ts). Adjust these for other environments. Model and purchase fixtures exercise behavior without authorizing payments; they do not establish live model quality or provider availability. The provider diagnostic sends unsigned requests only.
+
+### Repository structure
+
+```text
+public/                     Branding assets
+src/
+  components/
+    agent/                  Conversation and production controls
+    campaign/               Brief, direction, preview, progress, narration
+    layout/                 Navigation and workspace shell
+    ui/                     Shared dialogs and SVG glyphs
+    wallet/                 Pairing and purchase approval
+  lib/                      API client, persistence, exports
+  App.tsx                   Campaign state and interactions
+  index.css                 Component and layout styles
+  tokens.css                Theme tokens
+shared/
+  domain.ts                 Campaign, wallet, order, and quote types
+  agent.ts                  Conversation schemas
+server/
+  agent.ts                  Validated conversational tools
+  agent-model.ts            OpenAI transport and configuration
+  wallet.ts                 Agentic Wallet CLI adapter
+  policy.ts                 Payment constraints and requests
+  provider.ts               Provider transport and media handling
+  fulfillment.ts            Signed-request delivery flow
+  settlement.ts             Settlement-evidence validation
+  store.ts                  Orders and saved responses
+  audio-upload.ts           Narration validation and storage
+  index.ts                  Local HTTP API
+scripts/                    Provider diagnostics
+tests/                      Unit and browser tests
+```
+
+## Troubleshooting
+
+| Symptom | Resolution |
+| --- | --- |
+| Missing AI credentials | Set `OPENAI_API_KEY` and restart the API. |
+| OpenAI quota exhausted | Check API billing for the key's project; Binance funds and ChatGPT subscriptions do not cover it. |
+| Local service unavailable | Start the API; ensure only one process owns port `4317`. |
+| Session error after restart | Refresh to obtain a new local token. |
+| Pairing expires | Start fresh pairing and keep the service running. |
+| Expired or unsupported quote | Request another quote and inspect token, network, recipient, and wallet requirements. |
+| Delivery fails after authorization | Inspect receipts and wallet history; recover saved delivery when offered. Do not assume payment failed. |
+| Copy or audio excluded after editing | Review copy and replace or reconfirm narration. |
+| WebM unavailable | Use recent Chrome or Edge; keep the rendering tab open. |
+
+## Technical references
+
+- [Binance Agentic Wallet documentation](https://github.com/binance/binance-skills-hub/tree/main/skills/binance-web3/binance-agentic-wallet)
 - [Binance B402 Bazaar](https://developers.binance.com/en/docs/products/onchainpay-x402/b402-bazaar)
 - [Xona resource schemas](https://api.xona-agent.com/x402-resources)
-- [Xona BNB Chain support](https://xona-agent.com/blog/xona-ai-resources-multi-network-bnb-chain)
-- [Frontend design skill consulted](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md)
+- [OpenAI function calling](https://developers.openai.com/api/docs/guides/function-calling)
+- [OpenAI API and ChatGPT billing](https://help.openai.com/en/articles/9039756-managing-billing-settings-on-chatgpt-web-and-platform)
 
-Hackathon submission still requires a real demo video and a public GitHub link. This working directory has not been published or submitted.
+## License
+
+Commission's source code is distributed under the [MIT License](LICENSE).
+
+Third-party dependencies and bundled fonts retain their respective licenses. Generated and purchased media are subject to applicable provider terms; the repository license does not grant additional rights to those assets.

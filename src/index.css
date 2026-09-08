@@ -477,3 +477,5 @@ button:disabled { color: var(--text-faint); opacity: 1; }
 .poster-empty-content p { font-size: 12px; line-height: 1.6; max-width: 190px; margin: 0; }
 @media (max-height: 650px) { .empty-artwork-mark { margin-bottom: 10px; } .poster-empty-content p { margin: 6px auto 12px; } }
 
+
+.agent-offline-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }

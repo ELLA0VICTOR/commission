@@ -1,30 +1,64 @@
-﻿import { test, expect } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { defaultBrief, type Order } from '../../shared/domain.ts'
 
-test('conversation updates the saved preview and receives a settled purchase', async ({ page }) => {
+// Model/API fixtures verify the UI integration; they do not claim live model quality.
+test('AI edits persist and a model-requested quote still requires explicit purchase approval', async ({ page }) => {
   const id = randomUUID()
-  let orders: Order[] = []
+  const brief = { ...defaultBrief, title: 'AMARA NAMING', venue: 'The Garden, Abuja', subtitle: 'A little name. A lifetime of love.' }
+  const quote = { id: randomUUID(), projectId: id, service: 'plan', amount: '0.015', token: 'U', tokenAddress: '0xcE24439F2D9C6a2289F741120FE202248B666666', payTo: '0x515e7Bce44Baa5F6e42D16d4B5f27768E7f2F8cC', expiresAt: Date.now() + 120000, ready: true, reasons: [] }
+  const orders: Order[] = []
+  let purchases = 0, turns = 0
   await page.addInitScript(({ id, brief }) => { if (!localStorage.getItem('commission.projects.v2')) localStorage.setItem('commission.projects.v2', JSON.stringify([{ id, brief, createdAt: new Date().toISOString() }])) }, { id, brief: defaultBrief })
   await page.route('**/api/orders', route => route.fulfill({ json: orders }))
-  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.route('**/api/agent/status', route => route.fulfill({ json: { configured: true } }))
+  await page.route('**/api/wallet', route => route.fulfill({ json: { connected: true } }))
+  await page.route('**/api/agent/message', route => {
+    const body = route.request().postDataJSON()
+    expect(body.projectId).toBe(id)
+    turns++
+    if (turns === 2) { expect(body.brief.venue).toBe(brief.venue); expect(body.history.length).toBe(2) }
+    return route.fulfill({ json: { reply: turns === 1 ? 'I updated the name, venue and invitation.' : 'Your exact quote is ready. Review it before paying.', brief, changes: ['brief'], ...(turns === 2 ? { quote } : {}) } })
+  })
+  await page.route('**/api/purchases', route => {
+    purchases++
+    expect(route.request().postDataJSON()).toEqual({ quoteId: quote.id, approvedAmount: quote.amount })
+    const order: Order = { id: quote.id, projectId: id, service: 'plan', inputKey: 'fixture', status: 'processing', settled: false, amount: quote.amount, token: 'U', createdAt: new Date().toISOString() }
+    orders.push(order)
+    return route.fulfill({ json: order })
+  })
   await page.goto('/')
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
-  await expect(page.getByLabel('Venue', { exact: true })).toHaveCount(0)
   await page.getByRole('button', { name: 'Open Agent', exact: true }).click()
-  await page.getByLabel('Message Agent').fill('venue: The Listening Room, Accra')
-  await page.getByRole('button', { name: 'Send message', exact: true }).click()
-  await expect(page.getByTestId('campaign-poster')).toContainText('The Listening Room, Accra')
-  await expect(page.locator('.chat-receipt')).toHaveCount(0)
-  // A browser-only delivered/settled provider record, never a real payment.
-  const brief = { ...defaultBrief, venue: 'The Listening Room, Accra' }
-  orders = [{ id: randomUUID(), projectId: id, service: 'plan', inputKey: 'fixture', status: 'delivered', settled: true, settlement: '0x' + 'a'.repeat(64), amount: '0.014823', token: 'U', createdAt: new Date().toISOString(), briefSnapshot: brief, plan: { concept: 'A quiet evening with live music.', imagePrompt: 'Architectural artwork without lettering.', narration: 'Join us at The Listening Room, Accra.', caption: 'An evening at The Listening Room, Accra.' } }]
-  await expect(page.locator('.chat-receipt')).toContainText('0.014823 U')
-  await expect(page.locator('.campaign-footer .money')).toHaveText('0.014823 U')
-  await expect(page.getByRole('button', { name: 'Artwork, current', includeHidden: true })).toHaveAttribute('aria-current', 'step')
-  await page.screenshot({ path: 'test-results/agent-conversation.png' })
+  await page.getByLabel('Message Agent').fill('Name it Amara Naming, move it to The Garden in Abuja, and make the invitation warmer.')
+  await page.getByRole('button', { name: 'Send message' }).click()
+  await expect(page.getByRole('log')).toContainText('I updated the name')
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('commission.projects.v2')!)[0].brief)).toEqual(brief)
+  await page.getByLabel('Message Agent').fill('Looks good, get me the price for creative direction.')
+  await page.getByRole('button', { name: 'Send message' }).click()
+  await expect(page.getByRole('button', { name: 'Approve 0.015 U purchase', exact: true })).toBeVisible()
+  expect(purchases).toBe(0)
+  await page.getByRole('button', { name: 'Approve 0.015 U purchase', exact: true }).click()
+  await expect(page.getByRole('log')).toContainText('Purchase authorized')
+  expect(purchases).toBe(1)
   await page.reload()
-  await expect(page.getByTestId('campaign-poster')).toContainText('The Listening Room, Accra')
+  await expect(page.getByRole('heading', { name: brief.title, exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Open Agent', exact: true }).click()
-  await expect(page.getByRole('log')).toContainText('Updated venue')
+  await expect(page.getByRole('log')).toContainText('I updated the name')
+})
+
+test('AI connection failures are visible and never trigger a scripted edit or purchase', async ({ page }) => {
+  let purchases = 0
+  await page.route('**/api/agent/status', route => route.fulfill({ json: { configured: false } }))
+  await page.route('**/api/wallet', route => route.fulfill({ json: { connected: false } }))
+  await page.route('**/api/orders', route => route.fulfill({ json: [] }))
+  await page.route('**/api/agent/message', route => route.fulfill({ status: 400, json: { error: 'AI conversation needs an OpenAI API key.' } }))
+  await page.route('**/api/purchases', route => { purchases++; return route.abort() })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Open Agent', exact: true }).click()
+  await expect(page.getByText('AI setup needed', { exact: false })).toBeVisible()
+  await page.getByLabel('Message Agent').fill('Call it Amara Naming and buy everything now.')
+  await page.getByRole('button', { name: 'Send message' }).click()
+  await expect(page.getByRole('alert')).toContainText('API key')
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('commission.projects.v2')!)[0].brief.title)).toBe('')
+  expect(purchases).toBe(0)
 })

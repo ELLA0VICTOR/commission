@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test'
 import { AxeBuilder } from '@axe-core/playwright'
 import { randomUUID } from 'node:crypto'
-import type { Brief, Order, Plan, Quote } from '../../shared/domain.ts'
+import { defaultBrief, type Brief, type Order, type Plan, type Quote } from '../../shared/domain.ts'
 // Browser-only fixtures: these tests never invoke Binance signing or write real purchase records.
 test('payment approval is explicit; changed facts require copy review before narration', async ({ page }) => {
+  await page.addInitScript(brief => { localStorage.setItem('commission.projects.v2', JSON.stringify([{ id: crypto.randomUUID(), brief, createdAt: new Date().toISOString() }])) }, defaultBrief)
   const orders: Order[] = []
   let purchases = 0
   let quotedBrief: Brief
