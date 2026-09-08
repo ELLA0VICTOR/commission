@@ -13,6 +13,20 @@ function deps(patch: Partial<FulfillmentDependencies> = {}): FulfillmentDependen
   }
 }
 const quote = { service: 'image' as const, paymentId: 'wallet-payment', index: 2, body: { prompt: 'A blue scene' } }
+
+test('reports B402 settlement rejection without retrying, claiming a charge, or leaking provider text', async () => {
+  const current = order(); let calls = 0
+  await fulfill(quote, current, deps({ request: async () => {
+    calls++
+    return new Response(JSON.stringify({ error: 'Payment settlement failed: B402 settle reported failure: invalid_transaction_state private-debug-secret' }), { status: 402 })
+  } }))
+  assert.equal(calls, 1)
+  assert.equal(current.status, 'uncertain')
+  assert.equal(current.settled, false)
+  assert.equal(current.recoverable, undefined)
+  assert.match(current.error!, /invalid_transaction_state/)
+  assert.doesNotMatch(current.error!, /private-debug-secret/)
+})
 test('replays the identical request with the selected one-based wallet index and stores real settlement', async () => {
   const receipt = { success: true, transaction: '0x' + 'a'.repeat(64) }
   const current = order()

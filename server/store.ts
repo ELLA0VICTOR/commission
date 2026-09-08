@@ -1,4 +1,5 @@
 import { recordBodySettlement } from './settlement.ts'
+import { settlementFailure } from './provider-error.ts'
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { AsyncLocalStorage } from 'node:async_hooks'
@@ -30,6 +31,7 @@ export async function initStore(dataDir = resolve('.commission-data'), walletEnv
     try {
       const raw = await readResponse(order.id)
       if (!order.settled) recordBodySettlement(raw, order)
+      if (order.status === 'uncertain' && !order.settled) order.error = settlementFailure(raw) || order.error
       if (order.service === 'voice' && order.status === 'uncertain' && raw && typeof raw === 'object' && 'message' in raw && typeof raw.message === 'string' &&
         /TTS error 403/i.test(raw.message) && /used all available credits|reached its monthly spending limit/i.test(raw.message))
         order.error = 'The Xona speech provider is out of credits or has reached its spending limit. ' + (order.settled ? 'Payment settled, but no audio was delivered. ' : 'Payment may have settled. ') + 'Do not retry until the provider restores service.'

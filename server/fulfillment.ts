@@ -1,4 +1,5 @@
 import { recordBodySettlement } from './settlement.ts'
+import { settlementFailure } from './provider-error.ts'
 import type { Order, Plan, Service } from '../shared/domain.ts'
 export type FulfillmentQuote = { service: Service; paymentId: string; index: number; body: unknown }
 type Signature = { paymentHeaderName: string; paymentHeaderValue: string; approveTxHash?: string; signatureExpiresAt: number }
@@ -33,6 +34,8 @@ export async function fulfill(quote: FulfillmentQuote, order: Order, deps: Fulfi
       await deps.persist()
     }
     if (!response.ok) {
+      const failure = settlementFailure(raw)
+      if (failure && !order.settled) throw new Error(failure)
       const providerMessage = raw && typeof raw === 'object' && 'message' in raw && typeof raw.message === 'string' ? raw.message : ''
       if (/TTS error 403/i.test(providerMessage) && /used all available credits|reached its monthly spending limit/i.test(providerMessage))
         throw new Error('The Xona speech provider is out of credits or has reached its spending limit. ' + (order.settled ? 'Payment settled, but no audio was delivered. ' : 'Payment may have settled. ') + 'Do not retry until the provider restores service.')
