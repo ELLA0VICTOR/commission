@@ -41,6 +41,7 @@ export type Project = { uploadedNarration?: UploadedNarration; id: string; brief
 export type Quote = {
   id: string; projectId: string; service: Service; amount: string; token: string;
   tokenAddress: string; payTo: string; expiresAt: number; ready: boolean; reasons: string[];
+  retryOf?: string;
 }
 export type Order = {
   id: string; projectId: string; service: Service; inputKey: string;

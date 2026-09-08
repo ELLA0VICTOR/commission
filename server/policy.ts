@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util'
 import { createHash } from 'node:crypto'
+import { canRetryArtwork } from '../shared/payment-retry.ts'
 import type { Brief, Order, Plan, Service } from '../shared/domain.ts'
 
 export const U_TOKEN = '0xcE24439F2D9C6a2289F741120FE202248B666666'
@@ -62,9 +63,9 @@ export function samePaymentAccept(provider: Record<string, unknown>, wallet: Rec
 export function assertPurchaseState(orders: Order[], projectId: string, service: Service, retryOf?: string) {
   if (retryOf) {
     const previous = orders.find(order => order.id === retryOf)
-    if (!previous || previous.projectId !== projectId || previous.service !== service || service !== 'voice' ||
+    if (!previous || previous.projectId !== projectId || previous.service !== service || (service !== 'voice' && !canRetryArtwork(previous, orders)) ||
       previous.status !== 'uncertain' || previous.recoverable || orders.some(order => order.retryOf === retryOf))
-      throw new Error('This failed voice purchase cannot be retried. Check its saved delivery and retry history.')
+      throw new Error('This failed purchase cannot be retried. Check its saved delivery and retry history.')
   }
   const blocked = orders.some(order => order.projectId === projectId && order.status !== 'delivered' &&
     order.id !== retryOf && !orders.some(replacement => replacement.retryOf === order.id && replacement.status === 'delivered'))

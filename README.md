@@ -373,6 +373,8 @@ New purchases retain authorization timing, public payment terms, and the provide
 
 Before submitting an EIP-3009 payment, Commission checks the latest BNB Chain block timestamp and waits until it exceeds the authorization's `validAfter` value by more than two seconds. This covers the token's strict start-time check and allows a small margin for RPC lag. The wait is bounded and preserves at least 15 seconds of validity for settlement. If the chain clock cannot be checked or the window is too short, the request is not submitted. Signed fields are never modified, and a failed submitted payment is never automatically replayed.
 
+An artwork receipt with `invalid_transaction_state` can offer one explicit retry after the recorded authorization expires, provided no settlement or recoverable delivery is recorded. Open **Receipts → Request artwork retry quote**, check the previous payment, and acknowledge the new charge before approving the fresh price. Expiry is not proof of nonpayment. The original receipt and purchased direction are retained, and the earlier amount remains counted against the campaign budget.
+
 ## Technical references
 
 - [Binance Agentic Wallet documentation](https://github.com/binance/binance-skills-hub/tree/main/skills/binance-web3/binance-agentic-wallet)

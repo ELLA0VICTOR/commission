@@ -1,4 +1,5 @@
 import type { AgentTurn } from '../shared/agent'
+import { canRetryArtwork } from '../shared/payment-retry'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowDownToLine, ArrowUpRight, ChevronRight, CircleHelp, Menu, Message, ReceiptText, X } from './components/ui/Icons'
 import { briefSchema, planSchema, serviceNames, type Brief, type Order, type Plan, type Project, type Quote, type Service, type Wallet, type UploadedNarration } from '../shared/domain'
@@ -199,7 +200,7 @@ export default function App({ account, onSignOut }: { account?: { id: string; us
     if (deletionBlocked || !onSignOut) return
     try { await onSignOut() } catch (error) { setError((error as Error).message) }
   }
-  async function purchase(service: Service) {
+  async function purchase(service: Service, retryOf?: string) {
     setError('')
     if (!wallet.connected) { say('Connect your Binance Agentic Wallet first. No payment is made by connecting.'); setModal('wallet'); return }
     if (!briefSchema.safeParse(project.brief).success) { setError('Complete the event name, date, time, venue, call to action, and a budget between 0.0001 and 10 U.'); return }
@@ -207,15 +208,18 @@ export default function App({ account, onSignOut }: { account?: { id: string; us
     if (service === 'voice' && stale) { setError('Your brief changed. Open “Review copy”, check the script, and choose “Copy checked” before buying a voiceover.'); return }
     if (service === 'plan') commit(projectsRef.current.map(item => item.id === project.id ? { ...item, briefConfirmed: true } : item))
     setBusy(true)
-    try { setQuote(await api<Quote>('/quotes', { projectId: project.id, service, brief: project.brief, plan: project.plan })) }
+    try {
+      setQuote(await api<Quote>('/quotes', { projectId: project.id, service, brief: project.brief, plan: project.plan, retryOf }))
+      if (retryOf) setModal(null)
+    }
     catch (error) { setError((error as Error).message) }
     finally { setBusy(false) }
   }
-  async function approve() {
+  async function approve(retryAcknowledged = false) {
     if (!quote) return
     setBusy(true); setError('')
     try {
-      const order = await api<Order>('/purchases', { quoteId: quote.id, approvedAmount: quote.amount })
+      const order = await api<Order>('/purchases', { quoteId: quote.id, approvedAmount: quote.amount, retryAcknowledged })
       setOrders(previous => previous.some(item => item.id === order.id) ? previous : [...previous, order])
       setQuote(undefined)
       say('Purchase authorized. I’ll put the delivery and settlement record in this conversation.', order.projectId)
@@ -272,7 +276,7 @@ export default function App({ account, onSignOut }: { account?: { id: string; us
       {error && <p className="notice" role="alert">{error}</p>}
     </div></Modal>}
     {modal === 'wallet' && <WalletDialog wallet={wallet} onRefresh={refreshWallet} onClose={() => setModal(null)} />}
-    {quote && <PurchaseDialog quote={quote} onClose={() => { if (!busy) setQuote(undefined) }} onApprove={() => void approve()} busy={busy} />}
+    {quote && <PurchaseDialog key={quote.id} quote={quote} onClose={() => { if (!busy) setQuote(undefined) }} onApprove={acknowledged => void approve(acknowledged)} busy={busy} />}
     {modal === 'preview' && <Modal className="preview-modal" title={project.brief.title} onClose={() => setModal(null)}><div className="expanded-poster"><Poster brief={project.brief} format={format} artwork={artwork} /></div><p className="footnote mt-3">{artwork ? 'Purchased artwork with editable event details.' : 'Local layout preview. Original artwork has not been purchased.'}</p></Modal>}
     {modal === 'guide' && <Modal title="A small brief. A whole campaign." onClose={() => setModal(null)}><ol className="setup-steps"><li><span>1</span><div><strong>Make the brief yours</strong><p>Set your event details and budget. Explore the poster and story layouts free.</p></div></li><li><span>2</span><div><strong>Commission the creative direction</strong><p>Connect Binance Agentic Wallet. Review a live Xona quote; the agent buys a concept, art direction, script, and caption using B402.</p></div></li><li><span>3</span><div><strong>Approve the production</strong><p>Review the direction and commission original artwork. Your campaign is ready once the copy is reviewed and artwork is delivered. Voiceover is optional; each B402 purchase requires exact-price approval.</p></div></li><li><span>4</span><div><strong>Leave with real files</strong><p>Download your PNG poster, story, caption, and receipts as a ZIP. Export the animated promo separately as WebM, with optional narration. Date and venue edits reuse your artwork.</p></div></li></ol><p className="footnote">This workspace runs on your computer. Keep the local service running for wallet connection and production. Live delivery depends on Binance and Xona; preview exports work without a funded wallet.</p><a className="text-button mt-5" href="https://github.com/binance/binance-skills-hub/tree/main/skills/binance-web3/binance-agentic-wallet" target="_blank" rel="noreferrer">Official Binance Wallet documentation <ArrowUpRight size={15} /></a></Modal>}
     {modal === 'receipts' && <Modal title="Campaign receipts" onClose={() => setModal(null)}>
@@ -282,7 +286,7 @@ export default function App({ account, onSignOut }: { account?: { id: string; us
           setOrders(previous => previous.map(item => item.id === result.id ? result : item))
           setNotice('Saved delivery recovered. No new payment was made.')
         }).catch(error => setError((error as Error).message)).finally(() => { setBusy(false); setModal(null) })
-      }}>Retry saved delivery · no payment <ArrowUpRight size={14} /></button>}{order.assetUrl && <a className="text-button mt-2" href={order.assetUrl} download>Download original file <ArrowDownToLine size={14} /></a>}<code>{order.id}</code></article>)}</div>}
+      }}>Retry saved delivery · no payment <ArrowUpRight size={14} /></button>}{order.assetUrl && <a className="text-button mt-2" href={order.assetUrl} download>Download original file <ArrowDownToLine size={14} /></a>}{canRetryArtwork(order, projectOrders) && <button className="text-button mt-2" disabled={busy || agentThinking} onClick={() => void purchase("image", order.id)}>Request artwork retry quote <ArrowUpRight size={14} /></button>}<code>{order.id}</code></article>)}</div>}
       <button className="button secondary mt-5" onClick={() => download(new Blob([JSON.stringify(projectOrders, null, 2)], { type: 'application/json' }), filename(project.brief) + '-receipts.json')}><ArrowDownToLine size={16} /> Export receipts</button>
     </Modal>}
   </div>

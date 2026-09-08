@@ -57,3 +57,20 @@ test('voice retry requires an explicit failed-order reference and cannot duplica
   const plan = { concept: 'Campaign concept.', imagePrompt: 'A quiet rooftop without any text.', narration: 'Join us on the rooftop for an evening of music.', caption: 'An evening on the rooftop.' }
   assert.deepEqual(requestBody('voice', defaultBrief, plan), { text: plan.narration, voice_id: 'eve', language: 'en' })
 })
+
+test('artwork retry requires an explicit reference, expiry, no reported settlement, and at most one replacement', () => {
+  const failed: Order = { id: 'failed-art', projectId: 'campaign', service: 'image', inputKey: 'same-art',
+    status: 'uncertain', amount: '0.05', token: 'U', createdAt: new Date().toISOString(), settled: false,
+    error: 'B402 invalid_transaction_state', paymentDiagnostics: { paymentId: 'payment', optionIndex: 1,
+      signingStartedAt: 1, httpStatus: 402, authorization: { validBefore: '1' } } }
+  assert.throws(() => assertPurchaseState([failed], 'campaign', 'image'), /unresolved/)
+  assert.doesNotThrow(() => assertPurchaseState([failed], 'campaign', 'image', failed.id))
+  for (const patch of [{ settled: true }, { settlement: '0xhash' }, { recoverable: true }, { retryOf: 'earlier' },
+    { error: 'Unexplained network failure' }, { paymentDiagnostics: undefined },
+    { paymentDiagnostics: { ...failed.paymentDiagnostics!, authorization: { validBefore: '9999999999' } } }]) {
+    assert.throws(() => assertPurchaseState([{ ...failed, ...patch }], 'campaign', 'image', failed.id), /cannot be retried/)
+  }
+  const replacement: Order = { ...failed, id: 'replacement', retryOf: failed.id, status: 'processing' }
+  assert.throws(() => assertPurchaseState([failed, replacement], 'campaign', 'image', failed.id), /cannot be retried/)
+  assert.doesNotThrow(() => assertPurchaseState([failed, { ...replacement, status: 'delivered' }], 'campaign', 'voice'))
+})

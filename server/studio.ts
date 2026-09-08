@@ -83,8 +83,8 @@ type WalletOption = {
   assetTransferMethod: string; needApproveFirst: boolean; originalAccept: Record<string, unknown>;
 }
 function publicQuote(quote: InternalQuote): Quote {
-  const { id, projectId, service, amount, token, tokenAddress, payTo, expiresAt, ready, reasons } = quote
-  return { id, projectId, service, amount, token, tokenAddress, payTo, expiresAt, ready, reasons }
+  const { id, projectId, service, amount, token, tokenAddress, payTo, expiresAt, ready, reasons, retryOf } = quote
+  return { id, projectId, service, amount, token, tokenAddress, payTo, expiresAt, ready, reasons, retryOf }
 }
 async function prepareQuote(input: z.infer<typeof purchaseSchema>) {
   assertPurchaseState(orders, input.projectId, input.service, input.retryOf)
@@ -133,14 +133,16 @@ app.post('/api/agent/message', async (req, res) => {
 })
 
 app.post('/api/purchases', async (req, res) => {
-  const { quoteId, approvedAmount } = z.object({ quoteId: z.string().uuid(), approvedAmount: z.string() }).parse(req.body)
+  const { quoteId, approvedAmount, retryAcknowledged } = z.object({ quoteId: z.string().uuid(), approvedAmount: z.string(), retryAcknowledged: z.boolean().optional() }).parse(req.body)
   const existing = orders.find(order => order.id === quoteId)
   if (existing) { res.json(existing); return }
   const quote = quotes.get(quoteId)
   if (!quote || quote.expiresAt <= Date.now()) throw new Error('This quote expired. Request a fresh quote before approving.')
   if (!quote.ready || quote.amount !== approvedAmount) throw new Error('This exact payment has not been approved or is not ready.')
+  if (quote.retryOf && quote.service === 'image' && retryAcknowledged !== true)
+    throw new Error('Check the previous payment and acknowledge the new charge before approving this artwork retry.')
   assertPurchaseState(orders, quote.projectId, quote.service, quote.retryOf)
-  if (orders.some(order => order.projectId === quote.projectId && order.service === quote.service && order.inputKey === quote.inputKey))
+  if (orders.some(order => order.projectId === quote.projectId && order.service === quote.service && order.inputKey === quote.inputKey && order.id !== quote.retryOf))
     throw new Error('This exact production request already has a receipt. Reuse it instead of paying again.')
   assertBudget(quote.budget, orders.filter(order => order.projectId === quote.projectId).map(order => order.amount), quote.amount)
   const order: Order = {
