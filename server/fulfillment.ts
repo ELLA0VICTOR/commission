@@ -1,5 +1,6 @@
 import { recordBodySettlement } from './settlement.ts'
 import { settlementFailure } from './provider-error.ts'
+import { authorizationDiagnostics } from './payment-diagnostics.ts'
 import type { Order, Plan, Service } from '../shared/domain.ts'
 export type FulfillmentQuote = { service: Service; paymentId: string; index: number; body: unknown }
 type Signature = { paymentHeaderName: string; paymentHeaderValue: string; approveTxHash?: string; signatureExpiresAt: number }
@@ -12,12 +13,27 @@ export type FulfillmentDependencies = {
   persist: () => Promise<void>;
 }
 export async function fulfill(quote: FulfillmentQuote, order: Order, deps: FulfillmentDependencies) {
+  const diagnostic: NonNullable<Order['paymentDiagnostics']> = {
+    paymentId: quote.paymentId, optionIndex: quote.index, signingStartedAt: Date.now(),
+  }
+  order.paymentDiagnostics = diagnostic
   try {
     const signature = await deps.sign(quote.paymentId, quote.index)
-    if (signature.paymentHeaderName !== 'PAYMENT-SIGNATURE' || signature.approveTxHash || signature.signatureExpiresAt * 1000 <= Date.now())
+    diagnostic.signedAt = Date.now()
+    if (Number.isFinite(signature.signatureExpiresAt)) diagnostic.signatureExpiresAt = signature.signatureExpiresAt
+    Object.assign(diagnostic, authorizationDiagnostics(signature.paymentHeaderValue))
+    if (signature.paymentHeaderName !== 'PAYMENT-SIGNATURE' || signature.approveTxHash || !Number.isFinite(signature.signatureExpiresAt) || signature.signatureExpiresAt * 1000 <= Date.now())
       throw new Error('The wallet returned an unexpected or expired authorization. Check wallet activity before retrying.')
+    // Save only public authorization terms and timing, never the signed header.
+    await deps.persist()
+    diagnostic.requestStartedAt = Date.now()
     const response = await deps.request(quote.service, quote.body, signature.paymentHeaderValue)
+    diagnostic.respondedAt = Date.now()
+    diagnostic.httpStatus = response.status
+    const providerDate = Date.parse(response.headers.get('date') || '')
+    if (Number.isFinite(providerDate)) diagnostic.providerDate = providerDate
     const receiptHeader = response.headers.get('payment-response')
+    diagnostic.settlementHeaderPresent = Boolean(receiptHeader)
     if (receiptHeader) {
       try {
         const receipt = JSON.parse(Buffer.from(receiptHeader, 'base64').toString('utf8')) as Record<string, unknown>

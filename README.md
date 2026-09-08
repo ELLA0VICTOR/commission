@@ -363,6 +363,14 @@ commission/
 | Copy or audio excluded after editing | Review copy and replace or reconfirm narration. |
 | WebM unavailable | Use recent Chrome or Edge; keep the rendering tab open. |
 
+To inspect a payment from the server shell without contacting the wallet or provider:
+
+```bash
+node --import tsx scripts/inspect-payment.ts <receipt-id>
+```
+
+New purchases retain authorization timing, public payment terms, and the provider's HTTP status alongside the order. Payment signatures and authorization nonces are excluded from these diagnostics. Older receipts cannot supply timing that was not recorded. A failed settlement response alone does not prove that funds stayed in the wallet; check transaction evidence before authorizing a retry.
+
 ## Technical references
 
 - [Binance Agentic Wallet documentation](https://github.com/binance/binance-skills-hub/tree/main/skills/binance-web3/binance-agentic-wallet)

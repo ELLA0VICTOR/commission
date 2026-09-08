@@ -62,6 +62,45 @@ test('refuses expired authorizations before sending anything to the merchant', a
   }))
   assert.equal(requests, 0); assert.equal(current.status, 'uncertain')
 })
+
+test('records safe payment timing and terms on rejection without retaining signing secrets', async () => {
+  const authorization = { from: '0x' + 'a'.repeat(40), to: '0x' + 'b'.repeat(40), value: '50000000000000000', validAfter: '1', validBefore: '9999999999' }
+  const accepted = { network: 'eip155:56', asset: '0x' + 'c'.repeat(40), payTo: authorization.to, amount: authorization.value }
+  const header = Buffer.from(JSON.stringify({ accepted, payload: { authorization: { ...authorization, nonce: 'private-nonce' }, signature: 'private-signature' }, extensions: { secret: 'private-extension' } })).toString('base64')
+  const current = order(); const snapshots: string[] = []
+  await fulfill(quote, current, deps({
+    sign: async () => ({ paymentHeaderName: 'PAYMENT-SIGNATURE', paymentHeaderValue: header, signatureExpiresAt: Date.now() / 1000 + 60 }),
+    request: async (_service, _body, signature) => {
+      assert.equal(signature, header)
+      assert.ok(snapshots.some(snapshot => JSON.parse(snapshot).paymentDiagnostics.signedAt))
+      return new Response(JSON.stringify({ error: 'invalid_transaction_state' }), { status: 402, headers: { date: 'Tue, 08 Sep 2026 14:00:00 GMT' } })
+    },
+    persist: async () => { snapshots.push(JSON.stringify(current)) },
+  }))
+  assert.equal(current.status, 'uncertain'); assert.equal(current.settled, false)
+  assert.deepEqual(current.paymentDiagnostics?.authorization, authorization)
+  assert.deepEqual(current.paymentDiagnostics?.accepted, accepted)
+  assert.equal(current.paymentDiagnostics?.httpStatus, 402)
+  assert.equal(current.paymentDiagnostics?.settlementHeaderPresent, false)
+  assert.equal(current.paymentDiagnostics?.providerDate, Date.parse('2026-09-08T14:00:00Z'))
+  assert.ok(current.paymentDiagnostics!.respondedAt! >= current.paymentDiagnostics!.requestStartedAt!)
+  for (const snapshot of snapshots) {
+    assert.doesNotMatch(snapshot, /private-signature|private-nonce|private-extension/)
+    assert.equal(snapshot.includes(header), false)
+  }
+})
+
+test('refuses missing or nonfinite signature expiry before merchant submission', async () => {
+  for (const expiry of [undefined, NaN, Infinity]) {
+    const current = order(); let requests = 0
+    await fulfill(quote, current, deps({
+      sign: async () => ({ paymentHeaderName: 'PAYMENT-SIGNATURE', paymentHeaderValue: 'proof', signatureExpiresAt: expiry as number }),
+      request: async () => { requests++; return new Response('{}') },
+    }))
+    assert.equal(requests, 0); assert.equal(current.status, 'uncertain')
+    assert.match(current.error!, /expired authorization/)
+  }
+})
 test('delivery without a valid settlement receipt never becomes a fabricated payment confirmation', async () => {
   const current = order()
   await fulfill(quote, current, deps())

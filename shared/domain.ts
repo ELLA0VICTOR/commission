@@ -47,6 +47,13 @@ export type Order = {
   status: 'processing' | 'delivered' | 'uncertain';
   amount: string; token: string; createdAt: string; settlement?: string;
   settled: boolean; recoverable?: boolean; retryOf?: string; briefSnapshot?: Brief; sourceText?: string; assetUrl?: string; plan?: Plan; error?: string;
+  paymentDiagnostics?: {
+    paymentId: string; optionIndex: number; signingStartedAt: number;
+    signedAt?: number; signatureExpiresAt?: number; requestStartedAt?: number; respondedAt?: number;
+    httpStatus?: number; providerDate?: number; settlementHeaderPresent?: boolean;
+    accepted?: { network?: string; asset?: string; payTo?: string; amount?: string };
+    authorization?: { from?: string; to?: string; value?: string; validAfter?: string; validBefore?: string };
+  };
 }
 export type Wallet = { connected: boolean; address?: string; error?: string }
 export const serviceNames: Record<Service, string> = {
