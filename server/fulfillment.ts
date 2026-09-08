@@ -11,6 +11,7 @@ export type FulfillmentDependencies = {
   saveAsset: (raw: unknown, service: Service, id: string) => Promise<string>;
   saveResponse: (raw: unknown, id: string) => Promise<void>;
   persist: () => Promise<void>;
+  waitForAuthorization: (diagnostic: NonNullable<Order['paymentDiagnostics']>, signatureExpiresAt: number) => Promise<{ authorizationReadyAt: number; settlementBlockTimestamp: number }>;
 }
 export async function fulfill(quote: FulfillmentQuote, order: Order, deps: FulfillmentDependencies) {
   const diagnostic: NonNullable<Order['paymentDiagnostics']> = {
@@ -26,6 +27,9 @@ export async function fulfill(quote: FulfillmentQuote, order: Order, deps: Fulfi
       throw new Error('The wallet returned an unexpected or expired authorization. Check wallet activity before retrying.')
     // Save only public authorization terms and timing, never the signed header.
     await deps.persist()
+    Object.assign(diagnostic, await deps.waitForAuthorization(diagnostic, signature.signatureExpiresAt))
+    if (signature.signatureExpiresAt * 1000 <= Date.now())
+      throw new Error('The authorization expired before submission. No request was sent to the provider.')
     diagnostic.requestStartedAt = Date.now()
     const response = await deps.request(quote.service, quote.body, signature.paymentHeaderValue)
     diagnostic.respondedAt = Date.now()

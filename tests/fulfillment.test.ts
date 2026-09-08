@@ -9,6 +9,7 @@ function deps(patch: Partial<FulfillmentDependencies> = {}): FulfillmentDependen
     request: async () => new Response(JSON.stringify({ image_url: 'https://example.com/image.png' }), { status: 200 }),
     parsePlan: () => { throw new Error('Not a plan test') },
     saveAsset: async () => '/api/assets/fixture.png', saveResponse: async () => {}, persist: async () => {},
+    waitForAuthorization: async () => ({ authorizationReadyAt: Date.now(), settlementBlockTimestamp: Math.floor(Date.now() / 1000) }),
     ...patch,
   }
 }
@@ -61,6 +62,30 @@ test('refuses expired authorizations before sending anything to the merchant', a
     request: async () => { requests++; return new Response('{}') },
   }))
   assert.equal(requests, 0); assert.equal(current.status, 'uncertain')
+})
+
+test('waits for authorization readiness before the single merchant request', async () => {
+  const current = order(); let ready = false; let requests = 0
+  await fulfill(quote, current, deps({
+    waitForAuthorization: async () => {
+      ready = true
+      return { authorizationReadyAt: Date.now(), settlementBlockTimestamp: 1788880504 }
+    },
+    request: async () => { assert.equal(ready, true); requests++; return new Response('{}') },
+  }))
+  assert.equal(requests, 1)
+  assert.equal(current.paymentDiagnostics?.settlementBlockTimestamp, 1788880504)
+})
+
+test('does not submit or re-sign if chain timing cannot be confirmed', async () => {
+  const current = order(); let requests = 0; let signatures = 0
+  await fulfill(quote, current, deps({
+    sign: async () => { signatures++; return { paymentHeaderName: 'PAYMENT-SIGNATURE', paymentHeaderValue: 'proof', signatureExpiresAt: Date.now() / 1000 + 120 } },
+    waitForAuthorization: async () => { throw new Error('Chain clock unavailable') },
+    request: async () => { requests++; return new Response('{}') },
+  }))
+  assert.equal(signatures, 1); assert.equal(requests, 0)
+  assert.equal(current.status, 'uncertain')
 })
 
 test('records safe payment timing and terms on rejection without retaining signing secrets', async () => {

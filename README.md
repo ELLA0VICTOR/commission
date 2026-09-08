@@ -371,6 +371,8 @@ node --import tsx scripts/inspect-payment.ts <receipt-id>
 
 New purchases retain authorization timing, public payment terms, and the provider's HTTP status alongside the order. Payment signatures and authorization nonces are excluded from these diagnostics. Older receipts cannot supply timing that was not recorded. A failed settlement response alone does not prove that funds stayed in the wallet; check transaction evidence before authorizing a retry.
 
+Before submitting an EIP-3009 payment, Commission checks the latest BNB Chain block timestamp and waits until it exceeds the authorization's `validAfter` value by more than two seconds. This covers the token's strict start-time check and allows a small margin for RPC lag. The wait is bounded and preserves at least 15 seconds of validity for settlement. If the chain clock cannot be checked or the window is too short, the request is not submitted. Signed fields are never modified, and a failed submitted payment is never automatically replayed.
+
 ## Technical references
 
 - [Binance Agentic Wallet documentation](https://github.com/binance/binance-skills-hub/tree/main/skills/binance-web3/binance-agentic-wallet)

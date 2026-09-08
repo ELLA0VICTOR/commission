@@ -4,6 +4,7 @@ import { agentStatus } from './agent-model.ts'
 import { saveUploadedAudio } from './audio-upload.ts'
 import express from 'express'
 import { fulfill } from './fulfillment.ts'
+import { waitForAuthorization } from './authorization-window.ts'
 import { randomUUID, randomBytes } from 'node:crypto'
 import { z } from 'zod'
 import { briefSchema, planSchema, type Order, type Quote, type Brief } from '../shared/domain.ts'
@@ -154,7 +155,7 @@ app.post('/api/purchases', async (req, res) => {
   void fulfill(quote, order, {
     sign: (paymentId, index) => baw(['x402-payment', 'sign', '--paymentId', paymentId, '--selectedIndex', String(index)]),
     request: (service, body, signature) => merchantRequest(endpoints[service], body, signature),
-    parsePlan, saveAsset, saveResponse, persist,
+    parsePlan, saveAsset, saveResponse, persist, waitForAuthorization,
   }).catch(() => console.error('Could not persist purchase status. Check the local data directory before restarting.'))
   res.status(202).json(order)
 })

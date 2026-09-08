@@ -50,6 +50,7 @@ export type Order = {
   paymentDiagnostics?: {
     paymentId: string; optionIndex: number; signingStartedAt: number;
     signedAt?: number; signatureExpiresAt?: number; requestStartedAt?: number; respondedAt?: number;
+    authorizationReadyAt?: number; settlementBlockTimestamp?: number;
     httpStatus?: number; providerDate?: number; settlementHeaderPresent?: boolean;
     accepted?: { network?: string; asset?: string; payTo?: string; amount?: string };
     authorization?: { from?: string; to?: string; value?: string; validAfter?: string; validBefore?: string };
